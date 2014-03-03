@@ -29,29 +29,29 @@
   (vdecl (x : ty))
   ;; statements:
   [sts (st ...)]
-  (st (lval = rval)
-      (call g ℓs lvals)
-      (match lval (Some mode x => bk) (None => bk))
+  (st (lv = rv)
+      (call g ℓs lvs)
+      (match lv (Some mode x => bk) (None => bk))
       bk)
   ;; lvalues :
   ;; changing "field names" to be numbers
-  (lvals (lval ...))
-  (lval x                            ;; variable
-      (lval · f)                     ;; field projection
-      (lval @ lval)                    ;; indexing
-      (* lval))                      ;; deref
+  (lvs (lv ...))
+  (lv x                            ;; variable
+      (lv · f)                     ;; field projection
+      (lv @ lv)                    ;; indexing
+      (* lv))                      ;; deref
   ;; rvalues :
-  (rval (cm lval)                      ;; copy lvalue
-      (& ℓ mq lval)                  ;; take address of lvalue
-      (struct s ℓs (lval ...))       ;; struct constant
-      (new lval)                     ;; allocate memory
+  (rv (cm lv)                      ;; copy lvalue
+      (& ℓ mq lv)                  ;; take address of lvalue
+      (struct s ℓs (lv ...))       ;; struct constant
+      (new lv)                     ;; allocate memory
       number                       ;; constant number
-      (lval + lval)                    ;; sum
-      (Some lval)                    ;; create an Option with Some
+      (lv + lv)                    ;; sum
+      (Some lv)                    ;; create an Option with Some
       None                         ;; create an Option with None
-      (vec lval ...)                 ;; create a fixed-length vector
-      (vec-len lval)                 ;; extract length of a vector
-      (pack lval ty)                 ;; convert fixed-length to DST
+      (vec lv ...)                 ;; create a fixed-length vector
+      (vec-len lv)                 ;; extract length of a vector
+      (pack lv ty)                 ;; convert fixed-length to DST
       )
   (cm copy move)
   (mode (ref mq) move)
@@ -736,12 +736,12 @@
             ,(sub1 (term z)))])
 
 (define-metafunction Patina-machine
-  lval-deinit : srs H V T lval -> H
+  lvdeinit : srs H V T lv -> H
 
-  [(lval-deinit srs H V T lval)
+  [(lvdeinit srs H V T lv)
    (deinit H α z)
-   (where ty (lval-type srs T lval))
-   (where α (lval-addr srs H V T lval))
+   (where ty (lvtype srs T lv))
+   (where α (lvaddr srs H V T lv))
    (where z (sizeof srs ty))])
 
 (test-equal (term (deinit [(10 (ptr 1))
@@ -924,7 +924,7 @@
             (term 7))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; lval-type -- compute type of an lvalue
+;; lvtype -- compute type of an lvalue
 
 (define-metafunction Patina-machine
   dereftype : ty -> ty
@@ -939,31 +939,31 @@
    ,(car (drop (term (field-tys srs s ℓs)) (term f)))]) ; fixme--surely a better way
 
 (define-metafunction Patina-machine
-  lval-type : srs T lval -> ty
+  lvtype : srs T lv -> ty
   
-  [(lval-type srs T x)
+  [(lvtype srs T x)
    (vtype T x)]
   
-  [(lval-type srs T (* lval))
-   (dereftype (lval-type srs T lval))]
+  [(lvtype srs T (* lv))
+   (dereftype (lvtype srs T lv))]
   
-  [(lval-type srs T (lval · f))
-   (fieldtype srs (lval-type srs T lval) f)])
+  [(lvtype srs T (lv · f))
+   (fieldtype srs (lvtype srs T lv) f)])
 
-(test-equal (term (lval-type ,test-srs ,test-T (* p))) (term int))
+(test-equal (term (lvtype ,test-srs ,test-T (* p))) (term int))
 
 ;; FIXME --> l0 should be static
-(test-equal (term (lval-type ,test-srs ,test-T (c · 1))) (term (struct B (l0))))
+(test-equal (term (lvtype ,test-srs ,test-T (c · 1))) (term (struct B (l0))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; lval-addr -- lookup addr of variable in V
+;; lvaddr -- lookup addr of variable in V
 
 (define-metafunction Patina-machine
-  lval-addr-elem : srs H V T ty l lval lval -> z
+  lvaddr-elem : srs H V T ty l lv lv -> z
 
-  [(lval-addr-elem srs H V T ty_e l_v lval_v lval_i)
-   (offset (lval-addr srs H V T lval_v) z_e)
-   (where α_i (lval-addr srs H V T lval_i))
+  [(lvaddr-elem srs H V T ty_e l_v lv_v lv_i)
+   (offset (lvaddr srs H V T lv_v) z_e)
+   (where α_i (lvaddr srs H V T lv_i))
    (where (int l_i) (deref H α_i))
    (where z_e ,(* (term l_i) (term (sizeof srs ty_e))))
    (side-condition (>= (term l_i) 0))
@@ -972,46 +972,46 @@
   )
 
 (define-metafunction Patina-machine
-  lval-addr : srs H V T lval -> α
+  lvaddr : srs H V T lv -> α
   
-  [(lval-addr srs H V T x)
+  [(lvaddr srs H V T x)
    (vaddr V x)]
   
-  [(lval-addr srs H V T (* lval))
+  [(lvaddr srs H V T (* lv))
    α
-   (where (ptr α) (deref H (lval-addr srs H V T lval)))]
+   (where (ptr α) (deref H (lvaddr srs H V T lv)))]
        
-  [(lval-addr srs H V T (lval · f))
-   (offset (lval-addr srs H V T lval)
+  [(lvaddr srs H V T (lv · f))
+   (offset (lvaddr srs H V T lv)
            (offsetof srs s ℓs f))
-   (where (struct s ℓs) (lval-type srs T lval))]
+   (where (struct s ℓs) (lvtype srs T lv))]
 
   ;; indexing into a fixed-length vector
-  [(lval-addr srs H V T (lval_v @ lval_i))
-   (lval-addr-elem srs H V T ty_e l_v lval_v lval_i)
-   (where (vec ty_e l_v) (lval-type srs T lval_v))]
+  [(lvaddr srs H V T (lv_v @ lv_i))
+   (lvaddr-elem srs H V T ty_e l_v lv_v lv_i)
+   (where (vec ty_e l_v) (lvtype srs T lv_v))]
 
   ;; indexing into a dynamically sized vector
-  [(lval-addr srs H V T (lval_v @ lval_i))
-   (lval-addr-elem srs H V T ty_e l_v lval_v lval_i)
-   (where (vec ty_e) (lval-type srs T lval_v))
-   (where (int l_v) (reified srs H V T lval_v))]
+  [(lvaddr srs H V T (lv_v @ lv_i))
+   (lvaddr-elem srs H V T ty_e l_v lv_v lv_i)
+   (where (vec ty_e) (lvtype srs T lv_v))
+   (where (int l_v) (reified srs H V T lv_v))]
 
   )
 
-(test-equal (term (lval-addr ,test-srs ,test-H ,test-V ,test-T (c · 1)))
+(test-equal (term (lvaddr ,test-srs ,test-H ,test-V ,test-T (c · 1)))
             (term 16))
 
-(test-equal (term (lval-addr ,test-srs ,test-H ,test-V ,test-T ((c · 1) · 1)))
+(test-equal (term (lvaddr ,test-srs ,test-H ,test-V ,test-T ((c · 1) · 1)))
             (term 17))
 
-(test-equal (term (lval-addr ,test-srs ,test-H ,test-V ,test-T (* ((c · 1) · 1))))
+(test-equal (term (lvaddr ,test-srs ,test-H ,test-V ,test-T (* ((c · 1) · 1))))
             (term 97))
 
-(test-equal (term (lval-addr ,test-srs ,test-H ,test-V ,test-T (ints3 @ i1)))
+(test-equal (term (lvaddr ,test-srs ,test-H ,test-V ,test-T (ints3 @ i1)))
             (term 23))
 
-;(test-equal (term (lval-addr ,test-srs ,test-H ,test-V ,test-T (ints3 @ i4)))
+;(test-equal (term (lvaddr ,test-srs ,test-H ,test-V ,test-T (ints3 @ i4)))
 ;            (term 23))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1019,17 +1019,17 @@
 ;; portion (i.e., the length). Must be behind the most recent pointer.
 
 (define-metafunction Patina-machine
-  reified : srs H V T lval -> hv
+  reified : srs H V T lv -> hv
 
-  [(reified srs H V T (* lval))
+  [(reified srs H V T (* lv))
    (deref H (inc α))
-   (where α (lval-addr srs H V T lval))]
+   (where α (lvaddr srs H V T lv))]
 
-  [(reified srs H V T (lval_o · f))
-   (reified srs H V T lval_o)]
+  [(reified srs H V T (lv_o · f))
+   (reified srs H V T lv_o)]
 
-  [(reified srs H V T (lval_v @ lval_i))
-   (reified srs H V T lval_v)]
+  [(reified srs H V T (lv_v @ lv_i))
+   (reified srs H V T lv_v)]
 
   )
 
@@ -1037,7 +1037,7 @@
                            ((* intsp) @ i2)))
             (term (int 3)))
 
-(test-equal (term (lval-addr ,test-srs ,test-H ,test-V ,test-T ((* intsp) @ i1)))
+(test-equal (term (lvaddr ,test-srs ,test-H ,test-V ,test-T ((* intsp) @ i1)))
             (term 23))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1094,42 +1094,42 @@
             (term (int 3)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; rval-eval -- evaluate an rvalue and store it into the heap at address α
+;; rveval -- evaluate an rvalue and store it into the heap at address α
 
 (define-metafunction Patina-machine
-  rval-eval : srs H V T α rval -> H
+  rveval : srs H V T α rv -> H
 
-  [(rval-eval srs H V T α (copy lval))
+  [(rveval srs H V T α (copy lv))
    H_1
-   (where ty (lval-type srs T lval))
+   (where ty (lvtype srs T lv))
    (where z (sizeof srs ty))
-   (where β (lval-addr srs H V T lval))
+   (where β (lvaddr srs H V T lv))
    (where H_1 (memcopy H α β z))]
 
-  [(rval-eval srs H V T α (move lval))
+  [(rveval srs H V T α (move lv))
    H_1
-   (where ty (lval-type srs T lval))
+   (where ty (lvtype srs T lv))
    (where z (sizeof srs ty))
-   (where β (lval-addr srs H V T lval))
+   (where β (lvaddr srs H V T lv))
    (where H_1 (memmove H α β z))]
 
-  [(rval-eval srs H V T α (& ℓ mq lval))
+  [(rveval srs H V T α (& ℓ mq lv))
    H_1
-   (where β (lval-addr srs H V T lval))
-   (where ty (lval-type srs T lval))
+   (where β (lvaddr srs H V T lv))
+   (where ty (lvtype srs T lv))
    (where H_1 (update H α (ptr β)))
    (side-condition (not (term (is-DST srs ty))))]
 
-  [(rval-eval srs H V T α (& ℓ mq lval))
+  [(rveval srs H V T α (& ℓ mq lv))
    H_2
-   (where β (lval-addr srs H V T lval))
-   (where ty (lval-type srs T lval))
-   (where (int l) (reified srs H V T lval))
+   (where β (lvaddr srs H V T lv))
+   (where ty (lvtype srs T lv))
+   (where (int l) (reified srs H V T lv))
    (where H_1 (update H α (ptr β)))
    (where H_2 (update H_1 (inc α) (int l)))
    (side-condition (term (is-DST srs ty)))]
 
-  [(rval-eval srs H V T α (struct s ℓs lvals))
+  [(rveval srs H V T α (struct s ℓs lvs))
    (movemany H zs_0 βs αs)
 
    ;; types of each field:
@@ -1137,59 +1137,59 @@
    ;; sizes of each field's type:
    (where zs_0 ,(map (λ (t) (term (sizeof srs ,t))) (term tys)))
    ;; offset of each field:
-   (where zs_1 (field-offsets srs s lvals))
+   (where zs_1 (field-offsets srs s lvs))
    ;; source address of value for each field:
-   (where αs ,(map (λ (lval) (term (lval-addr srs H V T ,lval))) (term lvals)))
+   (where αs ,(map (λ (lv) (term (lvaddr srs H V T ,lv))) (term lvs)))
    ;; target address for each field relative to base address α;
    (where βs ,(map (λ (z) (+ (term α) z)) (term zs_1)))]
 
-  [(rval-eval srs H V T α (new lval))
+  [(rveval srs H V T α (new lv))
    (update H_2 α (ptr γ))
 
-   (where ty (lval-type srs T lval))
+   (where ty (lvtype srs T lv))
    (where z (sizeof srs ty))
-   (where β (lval-addr srs H V T lval))
+   (where β (lvaddr srs H V T lv))
    (where (H_1 γ) (malloc H z))
    (where H_2 (memmove H_1 γ β z))]
    
-  [(rval-eval srs H V T α number)
+  [(rveval srs H V T α number)
    (update H α (int number))]
    
-  [(rval-eval srs H V T α (lval_l + lval_r))
+  [(rveval srs H V T α (lv_l + lv_r))
    (update H α (int number_s))
 
-   (where α_l (lval-addr srs H V T lval_l))
-   (where α_r (lval-addr srs H V T lval_r))
+   (where α_l (lvaddr srs H V T lv_l))
+   (where α_r (lvaddr srs H V T lv_r))
    (where (int number_l) (deref H α_l))
    (where (int number_r) (deref H α_r))
    (where number_s (offset number_l number_r))]
 
-  [(rval-eval srs H V T α (Some lval))
+  [(rveval srs H V T α (Some lv))
    H_2
 
-   (where ty (lval-type srs T lval))
+   (where ty (lvtype srs T lv))
    (where z (sizeof srs ty))
-   (where β (lval-addr srs H V T lval))
+   (where β (lvaddr srs H V T lv))
    (where α_p ,(add1 (term α)))
    (where H_1 (memmove H α_p β z))
    (where H_2 (update H_1 α (int 1)))]
 
-  [(rval-eval srs H V T α None)
+  [(rveval srs H V T α None)
    (update H α (int 0))]
 
-  [(rval-eval srs H V T α (vec))
+  [(rveval srs H V T α (vec))
    H]
 
-  [(rval-eval srs H V T α (vec lval_e ...))
+  [(rveval srs H V T α (vec lv_e ...))
    H_1
 
-   ;; find addresses α_e of the inputs lval_e
-   (where [α_e ...] [(lval-addr srs H V T lval_e) ...])
+   ;; find addresses α_e of the inputs lv_e
+   (where [α_e ...] [(lvaddr srs H V T lv_e) ...])
    ;; determine ty of vector from type of 1st lvalue
-   (where [lval_a lval_b ...] [lval_e ...])
-   (where ty (lval-type srs T lval_a))
+   (where [lv_a lv_b ...] [lv_e ...])
+   (where ty (lvtype srs T lv_a))
    ;; length of vector comes from number of lvalues
-   (where l_v (len [lval_a lval_b ...]))
+   (where l_v (len [lv_a lv_b ...]))
    ;; find types/sizes of the elements (always the same for each element)
    (where [ty_e ...] (vec-tys srs ty l_v))
    (where [z_e ...] [(sizeof srs ty_e) ...])
@@ -1201,64 +1201,64 @@
 
   ;; pack from ~ty_s to ~ty_d where ty_d is DST
   ;; (see nearly identical borrowed pointer rule below)
-  [(rval-eval srs H V T α (pack lval_s (~ ty_d)))
+  [(rveval srs H V T α (pack lv_s (~ ty_d)))
    H_2
 
    ;; move pointer value
-   (where α_s (lval-addr srs H V T lval_s))
+   (where α_s (lvaddr srs H V T lv_s))
    (where H_1 (memmove H α α_s 1))
 
    ;; reify component of type and store into heap at offset 1 of fat
    ;; pointer
-   (where (~ ty_s)  (lval-type srs T lval))
+   (where (~ ty_s)  (lvtype srs T lv))
    (where hv (reify-pack srs ty_s ty_d))
    (where H_2 (update H_1 (inc α) hv))]
 
   ;; pack from &ty_s to &ty_d where ty_d is DST
   ;; (see nearly identical owned pointer rule above)
-  [(rval-eval srs H V T α (pack lval_s (& ℓ mq ty_d)))
+  [(rveval srs H V T α (pack lv_s (& ℓ mq ty_d)))
    H_2
 
    ;; move pointer value
-   (where α_s (lval-addr srs H V T lval_s))
+   (where α_s (lvaddr srs H V T lv_s))
    (where H_1 (memmove H α α_s 1))
 
    ;; reify component of type and store into heap at offset 1 of fat
    ;; pointer
-   (where (& ℓ mq ty_s)  (lval-type srs T lval_s))
+   (where (& ℓ mq ty_s)  (lvtype srs T lv_s))
    (where hv (reify-pack srs ty_s ty_d))
    (where H_2 (update H_1 (inc α) hv))]
 
   ;; len for non-DST
-  [(rval-eval srs H V T α (vec-len lval))
+  [(rveval srs H V T α (vec-len lv))
    (update H α (int l))
-   (where (vec ty l) (lval-type srs T lval))]
+   (where (vec ty l) (lvtype srs T lv))]
 
   ;; len for DST
-  [(rval-eval srs H V T α (vec-len lval))
-   (update H α (reified srs H V T lval))
-   (where (vec ty) (lval-type srs T lval))]
+  [(rveval srs H V T α (vec-len lv))
+   (update H α (reified srs H V T lv))
+   (where (vec ty) (lvtype srs T lv))]
 
   )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; lval-select -- helper for writing tests, selects values for a portion
+;; lvselect -- helper for writing tests, selects values for a portion
 ;; of the heap
 
 (define-metafunction Patina-machine
-  lval-select : srs H V T lval -> (hv ...)
+  lvselect : srs H V T lv -> (hv ...)
   
-  [(lval-select srs H V T lval)
+  [(lvselect srs H V T lv)
    ,(select (term H) (term α) (term z))
 
-   (where ty (lval-type srs T lval))
-   (where α (lval-addr srs H V T lval))
+   (where ty (lvtype srs T lv))
+   (where α (lvaddr srs H V T lv))
    (where z (sizeof srs ty))])
 
-;; tests for rval-eval and lval-select
+;; tests for rveval and lvselect
 
-(test-equal (term (lval-select ,test-srs
-                            (rval-eval ,test-srs ,test-H ,test-V ,test-T
+(test-equal (term (lvselect ,test-srs
+                            (rveval ,test-srs ,test-H ,test-V ,test-T
                                     (vaddr ,test-V c)
                                     (struct C (b1) (a b)))
                             ,test-V
@@ -1266,8 +1266,8 @@
                             c))
             (term ((int 23) (int 24) (ptr 98))))
 
-(test-equal (term (lval-select ,test-srs
-                            (rval-eval ,test-srs ,test-H ,test-V ,test-T
+(test-equal (term (lvselect ,test-srs
+                            (rveval ,test-srs ,test-H ,test-V ,test-T
                                     (vaddr ,test-V c)
                                     (struct C (b1) (a b)))
                             ,test-V
@@ -1275,8 +1275,8 @@
                             a))
             (term (void)))
 
-(test-equal (term (lval-select ,test-srs
-                            (rval-eval ,test-srs ,test-H ,test-V ,test-T
+(test-equal (term (lvselect ,test-srs
+                            (rveval ,test-srs ,test-H ,test-V ,test-T
                                     (vaddr ,test-V p)
                                     (new i))
                             ,test-V
@@ -1284,8 +1284,8 @@
                             p))
             (term ((ptr 100))))
 
-(test-equal (term (lval-select ,test-srs
-                            (rval-eval ,test-srs ,test-H ,test-V ,test-T
+(test-equal (term (lvselect ,test-srs
+                            (rveval ,test-srs ,test-H ,test-V ,test-T
                                     (vaddr ,test-V p)
                                     (new i))
                             ,test-V
@@ -1293,13 +1293,13 @@
                             p))
             (term ((ptr 100))))
 
-(test-equal (term (deref (rval-eval ,test-srs ,test-H ,test-V ,test-T
+(test-equal (term (deref (rveval ,test-srs ,test-H ,test-V ,test-T
                                  (vaddr ,test-V p)
                                  (new i)) 100))
             (term (int 22))) ;; *p now contains value of i
 
-(test-equal (term (lval-select ,test-srs
-                            (rval-eval ,test-srs ,test-H ,test-V ,test-T
+(test-equal (term (lvselect ,test-srs
+                            (rveval ,test-srs ,test-H ,test-V ,test-T
                                     (vaddr ,test-V q)
                                     (& mq imm (* ((c · 1) · 1))))
                             ,test-V
@@ -1307,8 +1307,8 @@
                             q))
             (term ((ptr 97))))
 
-(test-equal (term (lval-select ,test-srs
-                            (rval-eval ,test-srs ,test-H ,test-V ,test-T
+(test-equal (term (lvselect ,test-srs
+                            (rveval ,test-srs ,test-H ,test-V ,test-T
                                     (vaddr ,test-V i)
                                     (i + (* p)))
                             ,test-V
@@ -1317,8 +1317,8 @@
             (term ((int 49))))
 
 ;; test that `None` writes a 0 into the discriminant, leaves rest unchanged
-(test-equal (term (lval-select ,test-srs
-                            (rval-eval ,test-srs ,test-H ,test-V ,test-T
+(test-equal (term (lvselect ,test-srs
+                            (rveval ,test-srs ,test-H ,test-V ,test-T
                                     (vaddr ,test-V s)
                                     None)
                             ,test-V
@@ -1327,8 +1327,8 @@
             (term ((int 0) (ptr 95))))
 
 ;; test that `(Some p)` writes a 1 into the discriminant
-(test-equal (term (lval-select ,test-srs
-                            (rval-eval ,test-srs ,test-H ,test-V ,test-T
+(test-equal (term (lvselect ,test-srs
+                            (rveval ,test-srs ,test-H ,test-V ,test-T
                                     (vaddr ,test-V s)
                                     (Some p))
                             ,test-V
@@ -1337,8 +1337,8 @@
             (term ((int 1) (ptr 99))))
 
 ;; test that `(Some p)` deinitializes `p`
-(test-equal (term (lval-select ,test-srs
-                            (rval-eval ,test-srs ,test-H ,test-V ,test-T
+(test-equal (term (lvselect ,test-srs
+                            (rveval ,test-srs ,test-H ,test-V ,test-T
                                     (vaddr ,test-V s)
                                     (Some p))
                             ,test-V
@@ -1347,8 +1347,8 @@
             (term (void)))
 
 ;; test `(vec i1 i2 i3)`
-(test-equal (term (lval-select ,test-srs
-                            (rval-eval ,test-srs ,test-H ,test-V ,test-T
+(test-equal (term (lvselect ,test-srs
+                            (rveval ,test-srs ,test-H ,test-V ,test-T
                                     (vaddr ,test-V ints3)
                                     (vec i1 i2 i3))
                             ,test-V
@@ -1357,11 +1357,11 @@
             (term ((int 1) (int 2) (int 3))))
 
 ;; test pack
-(test-equal (term (lval-select ,test-srs
-                            (rval-eval ,test-srs
+(test-equal (term (lvselect ,test-srs
+                            (rveval ,test-srs
                                     ;; clear out the initial value of intsp,
                                     ;; then put it back
-                                    (lval-deinit ,test-srs ,test-H ,test-V ,test-T
+                                    (lvdeinit ,test-srs ,test-H ,test-V ,test-T
                                               intsp)
                                     ,test-V
                                     ,test-T
@@ -1373,8 +1373,8 @@
             (term ((ptr 22) (int 3))))
 
 ;; test len for non-DST
-(test-equal (term (lval-select ,test-srs
-                            (rval-eval ,test-srs
+(test-equal (term (lvselect ,test-srs
+                            (rveval ,test-srs
                                     ,test-H
                                     ,test-V
                                     ,test-T
@@ -1386,8 +1386,8 @@
             (term ((int 3))))
 
 ;; test len for DST
-(test-equal (term (lval-select ,test-srs
-                            (rval-eval ,test-srs
+(test-equal (term (lvselect ,test-srs
+                            (rveval ,test-srs
                                     ,test-H
                                     ,test-V
                                     ,test-T
@@ -1399,8 +1399,8 @@
             (term ((int 3))))
 
 ;; test taking address of DST
-(test-equal (term (lval-select ,test-srs
-                            (rval-eval ,test-srs
+(test-equal (term (lvselect ,test-srs
+                            (rveval ,test-srs
                                     ,test-H
                                     ,test-V
                                     ,test-T
@@ -1499,18 +1499,18 @@
 )
 
 (define-metafunction Patina-machine
-  lval-free : srs H V T lval -> H
+  lvfree : srs H V T lv -> H
 
-  [(lval-free srs H V T lval)
+  [(lvfree srs H V T lv)
    (free srs H ty α)
-   (where ty (lval-type srs T lval))
-   (where α (lval-addr srs H V T lval))])
+   (where ty (lvtype srs T lv))
+   (where α (lvaddr srs H V T lv))])
 
-(test-equal (term (lval-free ,test-srs ,test-H ,test-V ,test-T p))
+(test-equal (term (lvfree ,test-srs ,test-H ,test-V ,test-T p))
             (term (shrink ,test-H 99 1)))
 
-(test-equal (term (lval-deinit ,test-srs
-                            (lval-free ,test-srs ,test-H ,test-V ,test-T p)
+(test-equal (term (lvdeinit ,test-srs
+                            (lvfree ,test-srs ,test-H ,test-V ,test-T p)
                             ,test-V
                             ,test-T
                             p))
@@ -1626,18 +1626,18 @@
    ;; Assignments. The memory for the lvalue should always be alloc'd,
    ;; though not always init'd.
    ;; FIXME – we need to free the old memory
-   [--> ((srs fns) H V T [(ℓ ((lval = rval) st ...)) sf ...])
+   [--> ((srs fns) H V T [(ℓ ((lv = rv) st ...)) sf ...])
         ((srs fns) H_1 V T [(ℓ (st ...)) sf ...])
-        (where α (lval-addr srs H V T lval))
-        (where H_1 (rval-eval srs H V T α rval))]
+        (where α (lvaddr srs H V T lv))
+        (where H_1 (rveval srs H V T α rv))]
 
    ;; Match, None case.
    [--> ((srs fns) H V T [(ℓ [st_a st ...]) sf ...])
         ((srs fns) H [() vmap ...] [() tmap ...] [(ℓ_m [bk_n]) (ℓ [st ...]) sf ...])
         ;; st_a is some kind of match:
-        (where (match lval_d (Some mode x_d => bk_s) (None => bk_n)) st_a)
+        (where (match lv_d (Some mode x_d => bk_s) (None => bk_n)) st_a)
         ;; the discriminant lies at address α_d:
-        (where α_d (lval-addr srs H V T lval_d))
+        (where α_d (lvaddr srs H V T lv_d))
         ;; it is a None value:
         (where (int 0) (deref H α_d))
         ;; generate a fresh lifetime: (FIXME)
@@ -1650,11 +1650,11 @@
    [--> ((srs fns) H V T [(ℓ [st_a st ...]) sf ...])
         C_n
         ;; st_a is a match:
-        (where (match lval_d (Some mode x_m => bk_s) (None => bk_n)) st_a)
+        (where (match lv_d (Some mode x_m => bk_s) (None => bk_n)) st_a)
         ;; the discriminant lies at address α_d:
-        (where α_d (lval-addr srs H V T lval_d))
+        (where α_d (lvaddr srs H V T lv_d))
         ;; the discriminant has Option type:
-        (where (Option ty) (lval-type srs T lval_d))
+        (where (Option ty) (lvtype srs T lv_d))
         ;; it is a Some value:
         (where (int 1) (deref H α_d))
         ;; make a pointer to the payload:
@@ -1699,24 +1699,24 @@
         ;; unpack the stack frames:
         (where [(ℓ_1 sts_1) sf_r ...] S)
         ;; unpack the statements sts_1 from top-most activation:
-        (where ((call g ℓs_a lvals_a) st_r ...) sts_1)
+        (where ((call g ℓs_a lvs_a) st_r ...) sts_1)
         ;; determine the types of the actual args to be passed:
-        (where tys_a ,(map (λ (lval) (term (lval-type srs T ,lval)))
-                           (term lvals_a)))
+        (where tys_a ,(map (λ (lv) (term (lvtype srs T ,lv)))
+                           (term lvs_a)))
         ;; determine sizes of those types
         (where zs_a ,(map (λ (ty) (term (sizeof srs ,ty)))
                           (term tys_a)))
         ;; determine where lvalues are found in memory
-        (where αs_a ,(map (λ (lval) (term (lval-addr srs H V T ,lval)))
-                              (term lvals_a)))
+        (where αs_a ,(map (λ (lv) (term (lvaddr srs H V T ,lv)))
+                              (term lvs_a)))
         ;; lookup the fun def'n (FIXME s/ℓs_f/ℓs_a/):
         (where (fun g ℓs_f ((x_f : ty_f) ...) bk_f) (fun-defn fns g))
         ;; allocate space for parameters in memory:
         (where (vmap_a tmap_a H_1) (alloc-variables srs H ((x_f : ty_f) ...)))
         ;; determine addresses for each formal argument:
-        (where βs_f ,(map (λ (lval) (term (lval-addr srs H_1
+        (where βs_f ,(map (λ (lv) (term (lvaddr srs H_1
                                                         (vmap_a) (tmap_a)
-                                                        ,lval)))
+                                                        ,lv)))
                              (term (x_f ...))))
         ;; move from actual params into formal params:
         (where H_2 (movemany H_1 zs_a βs_f αs_a))
@@ -1837,6 +1837,3 @@
 
 (test-->> machine-step dst-state-0 dst-state-N)
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; print test results
-(test-results)
