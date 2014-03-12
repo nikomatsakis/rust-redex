@@ -84,60 +84,71 @@
 (test-results)
 
 'Γ-get
-(define-metafunction 
+(define-judgment-form
   patina
-  Γ-get : Γ x -> τ
-  [(Γ-get (x_0 : τ Γ) x_0) τ]
-  [(Γ-get (x_0 : τ Γ) x_1) (Γ-get Γ x_1)]
+  #:mode (Γ-get I I O)
+  #:contract (Γ-get Γ x τ)
+  [----------------------------- "Γ-get-here"
+   (Γ-get (x_0 : τ Γ) x_0 τ)
+   ]
+  [(Γ-get Γ x_1 τ_1)
+   --------------------------------- "Γ-get-there"
+   (Γ-get (x_0 : τ_0 Γ) x_1 τ_1)
+   ]
   )
 
-(test-equal 
-  (term (Γ-get (x : int ∅) x)) 
-  (term int))
-(test-equal 
-  (term (Γ-get (y : int (x : int ∅)) x)) 
-  (term int))
+(test-equal
+  (judgment-holds
+    (Γ-get (x : int ∅) x τ)
+    τ)
+  '(int))
+(test-equal
+  (judgment-holds
+    (Γ-get (y : int (x : int ∅)) x τ)
+    τ)
+  '(int))
+(test-equal
+  (judgment-holds
+    (Γ-get ∅ x τ)
+    τ)
+  '())
 (test-results)
+
 
 'τ-=
-(define-metafunction
+(define-judgment-form
   patina
-  [(τ-= int int) #t]
+  #:mode (τ-= I I)
+  #:contract (τ-= τ τ)
+  [------------- "τ-=-int-int"
+   (τ-= int int)
+   ]
   )
 
-(test-equal
-  (term (τ-= int int))
-  (term #t))
+(test-equal #t (judgment-holds (τ-= int int)))
 (test-results)
 
-; I think this is ok
 'Γ-⊆
-(define-metafunction
+(define-judgment-form
   patina
-  [(Γ-⊆ ∅ Γ) #t]
-  [(Γ-⊆ (x : τ Γ) ∅) #f]
-  [(Γ-⊆ (x : τ Γ_0) Γ_1)
-   (Γ-⊆ Γ_0 (Γ-use Γ_1 x))
-   (side-condition (term (τ-= τ (Γ-get Γ_1 x))))])
+  #:mode (Γ-⊆ I I)
+  #:contract (Γ-⊆ Γ Γ)
+  [------------- "Γ-⊆-∅"
+   (Γ-⊆ ∅ Γ)
+   ]
+  [(Γ-get Γ_1 x τ_1) (τ-= τ_0 τ_1) (Γ-⊆ Γ_0 (Γ-use Γ_1 x))
+   ------------------------------------------------------- "Γ-⊆-¬∅"
+   (Γ-⊆ (x : τ_0 Γ_0) Γ_1)
+   ]
+  )
 
-(test-equal
-  (term (Γ-⊆ ∅ ∅))
-  (term #t))
-(test-equal
-  (term (Γ-⊆ ∅ (x : int (y : int ∅))))
-  (term #t))
-(test-equal
-  (term (Γ-⊆ (x : int ∅) ∅))
-  (term #f))
-(test-equal
-  (term (Γ-⊆ (x : int ∅) (y : int (x : int ∅))))
-  (term #t))
-(test-equal
-  (term (Γ-⊆ (x : int (x : int ∅)) (x : int ∅)))
-  (term #f))
-(test-equal
-  (term (Γ-⊆ (x : int (x : int ∅)) (x : int (x : int ∅))))
-  (term #t))
+(test-equal #t (judgment-holds (Γ-⊆ ∅ ∅)))
+(test-equal #t (judgment-holds (Γ-⊆ ∅ (x : int (y : int ∅)))))
+(test-equal #f (judgment-holds (Γ-⊆ (x : int ∅) ∅)))
+(test-equal #t (judgment-holds (Γ-⊆ (x : int ∅) (y : int (x : int ∅)))))
+(test-equal #f (judgment-holds (Γ-⊆ (x : int (x : int ∅)) (x : int ∅))))
+(test-equal #t (judgment-holds (Γ-⊆ (x : int (x : int ∅)) (x : int (x : int ∅)))))
+(test-equal #f (judgment-holds (Γ-⊆ (z : int ∅) (x : int ∅))))
 (test-results)
 
 'τ-lv
@@ -145,8 +156,8 @@
  patina
  #:mode (τ-lv I I O)
  #:contract (τ-lv Γ lv τ)
- [(where τ  (Γ-get Γ x))
-  ---------------------------- "τ-lv-var"
+ [(Γ-get Γ x τ)
+  ------------- "τ-lv-var"
   (τ-lv Γ x τ) ; TODO this may need to be adjusted for linear types
   ]
  )
@@ -156,6 +167,11 @@
    (τ-lv (y : int (x : int (z : int ∅))) x τ)
    τ) 
  '(int))
+(test-equal
+  (judgment-holds
+    (τ-lv ∅ x τ)
+    τ)
+  '())
 (test-results)
 
 'τ-rv
@@ -202,9 +218,8 @@
    (τ-st Γ_0 (delete x) Γ_1)
    ]
   ; TODO delete non-variables somehow
-  [(τ-st (Γ-extend-many Γ_0 vds) st Γ_1) 
-   (side-condition (Γ-⊆ Γ_1 Γ_0))
-   ------------------------------------- "τ-st-bk"
+  [(τ-st (Γ-extend-many Γ_0 vds) st Γ_1) (Γ-⊆ Γ_1 Γ_0)
+   --------------------------------------------------- "τ-st-bk"
    (τ-st Γ_0 (block vds st) Γ_1)
    ]
   )
