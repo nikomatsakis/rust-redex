@@ -2124,7 +2124,7 @@
 ;;    let i: int;
 ;;    'b: {
 ;;      let r-imm-B: &'b B<'static>;
-;;      let r-mut-B: &'b B<'static>;
+;;      let r-mut-B: &'b mut B<'static>;
 ;;      let owned-B: ~B<'static>;
 ;;      let owned-E: ~E;
 ;;      let r-mut-int: &'a mut int
