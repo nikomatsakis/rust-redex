@@ -39,12 +39,12 @@
   (prog (srs fns))
   ;; structures:
   (srs (sr ...))
-  (sr (struct s ℓs (ty ...)))
+  (sr (struct s vℓs (ty ...)))
   ;; lifetimes:
   (ℓs (ℓ ...))
   ;; function def'ns
   (fns (fn ...))
-  (fn (fun g ℓs vdecls bk))
+  (fn (fun g vℓs vdecls bk))
   ;; blocks:
   (bk (block ℓ vdecls sts))
   ;; variable decls
@@ -91,6 +91,12 @@
   ;; mq : mutability qualifier
   (mq mut imm)
   (mqs [mq ...])
+  ;; variance qualifier
+  (vq co      ; covariant
+      contra  ; contravariant
+      in)     ; invariant
+  (vℓ (vq ℓ))
+  (vℓs (vℓ ...))
   ;; variables
   (x variable-not-otherwise-mentioned)
   ;; function names
@@ -146,13 +152,13 @@
 
 (define test-srs
   (term [(struct A () (int))
-         (struct B (l0) (int (& l0 mut int)))
-         (struct C (l0) ((struct A ())
-                         (struct B (l0))))
-         (struct D (l0) ((struct C (l0))
-                         (struct A ())
-                         (struct C (l0))
-                         (struct B (l0))))
+         (struct B ((co l0)) (int (& l0 mut int)))
+         (struct C ((co l0)) ((struct A ())
+                              (struct B (l0))))
+         (struct D ((co l0)) ((struct C (l0))
+                              (struct A ())
+                              (struct C (l0))
+                              (struct B (l0))))
          (struct E () [(~ int)])
          ]))
 
@@ -224,9 +230,9 @@
 
 (define test-dst-srs
   (term [(struct RCDataInt3 () [int (vec int 3)])
-         (struct RCInt3 (l0) [(& l0 imm (struct RCDataInt3 []))])
+         (struct RCInt3 ((co l0)) [(& l0 imm (struct RCDataInt3 []))])
          (struct RCDataIntN () (int (vec int erased)))
-         (struct RCIntN (l0) [(& l0 imm (struct RCDataIntN []))])
+         (struct RCIntN ((co l0)) [(& l0 imm (struct RCDataIntN []))])
          (struct Cycle1 () [(Option (~ (struct Cycle []))) (vec int erased)])
          (struct Cycle2 () [(Option (~ (struct Cycle [])))])
          ]))
@@ -237,7 +243,7 @@
 ;; simple test prog that assigns to the result pointer
 
 (define twentytwo-main
-  (term (fun main [a] [(outp (& a mut int))]
+  (term (fun main [(co a)] [(outp (& a mut int))]
              (block l0 [] [((* outp) = 22)]))))
 
 (check-not-false (redex-match Patina-machine fn twentytwo-main))
@@ -258,7 +264,7 @@
 (check-not-false (redex-match Patina-machine srs sum-srs))
 
 (define sum-main
-  (term (fun main [a] [(outp (& a mut int))]
+  (term (fun main [(co a)] [(outp (& a mut int))]
              (block l0
                     [(i int)
                      (n (Option (~ (struct List []))))
@@ -299,8 +305,9 @@
 ;;     }
 ;; }
 (define sum-sum-list
-  (term (fun sum-list [a b] [(inp (& a imm (struct List [])))
-                             (outp (& b mut int))]
+  (term (fun sum-list [(contra a) (co b)] 
+                      [(inp (& a imm (struct List [])))
+                       (outp (& b mut int))]
              (block l0
                     [(r int)]
                     [(r = ((* inp) · 0))
@@ -335,14 +342,14 @@
 
 (define dst-srs
   (term [(struct RCDataInt3 () [int (vec int 3)])
-         (struct RCInt3 (l0) [(& l0 imm (struct RCDataInt3 []))])
+         (struct RCInt3 ((co l0)) [(& l0 imm (struct RCDataInt3 []))])
          (struct RCDataIntN () (int (vec int erased)))
-         (struct RCIntN (l0) [(& l0 imm (struct RCDataIntN []))])
+         (struct RCIntN ((co l0)) [(& l0 imm (struct RCDataIntN []))])
          ]))
 
 ;; gonna be super tedious...
 (define dst-main
-  (term (fun main [a] [(outp (& a mut int))]
+  (term (fun main [(co a)] [(outp (& a mut int))]
              (block l0 [(i1 int)
                         (i2 int)
                         (i3 int)
@@ -656,7 +663,7 @@
   
   [(fun-defn (fn_0 fn_1 ...) g)
    fn_0
-   (where (fun g ℓs ((x ty) ...) bk) fn_0)]
+   (where (fun g vℓs ((x ty) ...) bk) fn_0)]
 
   [(fun-defn (fn_0 fn_1 ...) g)
    (fun-defn (fn_1 ...) g)])
@@ -922,11 +929,11 @@
 (define-metafunction Patina-machine
   field-tys : srs s ℓs -> (ty ...)
   
-  [(field-tys ((struct s_0 (ℓ_0 ...) (ty_0 ...)) sr ...) s_0 [ℓ_1 ...])
+  [(field-tys ((struct s_0 ((_ ℓ_0) ...) (ty_0 ...)) sr ...) s_0 [ℓ_1 ...])
    ((subst-ty θ ty_0) ...)
    (where θ [(ℓ_0 ℓ_1) ...])]
 
-  [(field-tys ((struct s_0 (ℓ_0 ...) (ty_0 ...)) sr ...) s_1 ℓs_1)
+  [(field-tys ((struct s_0 ((_ ℓ_0) ...) (ty_0 ...)) sr ...) s_1 ℓs_1)
    (field-tys (sr ...) s_1 ℓs_1)])
 
 (test-equal (term (field-tys ,test-srs A ()))
@@ -2061,7 +2068,7 @@
         (where αs_a ,(map (λ (lv) (term (lvaddr srs H V T ,lv)))
                               (term lvs_a)))
         ;; lookup the fun def'n
-        (where (fun g (ℓ_f ...) vdecls_f bk_f) (fun-defn fns g))
+        (where (fun g ((vq_f ℓ_f) ...) vdecls_f bk_f) (fun-defn fns g))
         ; generate a fresh lifetime for the function call
         (where ℓ_fresh (fresh-lifetime-not-on-stack S lX))
         ; substitute the actual lifetimes for the formal lifetimes ...
@@ -2274,7 +2281,7 @@
 
 (define test-ty-srs test-srs)
 (define test-ty-fns
-  (term [(fun drop-owned-B [l0] [(x (~ (struct B (l0))))]
+  (term [(fun drop-owned-B [(co l0)] [(x (~ (struct B (l0))))]
               (block l1
                      []
                      [(drop x)]))
@@ -4052,7 +4059,7 @@
    (st-ok (srs fns) T Λ VL £ Δ (drop lv) £ Δ_1)]
 
   [;; lookup the fun def'n
-   (where (fun g [ℓ_f ...] [(x_f ty_f) ...] bk_f) (fun-defn fns g))
+   (where (fun g [(vq_f ℓ_f) ...] [(x_f ty_f) ...] bk_f) (fun-defn fns g))
    ;; subst from formal lifetime to actual lifetimes
    (where θ [(ℓ_f ℓ_a) ...])
    ;; evaluate actual arguments provided
@@ -4386,18 +4393,19 @@
    (where Λ  [(ℓ []) ...])    ;; FIXME - establish initial relations between lifetimes
    (where VL [[(x ℓ_bk)] ...])
    (bk-ok (srs fns) T Λ VL [] [] bk £ Δ)
+   ;; FIXME check that variance is ok
 
    ;; all parameters must be dropped
    (lv-dropped-if-necessary srs T Δ x) ...
    --------------------------------------------------
-   (fn-ok (srs fns) (fun g [ℓ ...] [(x ty) ...] bk))]
+   (fn-ok (srs fns) (fun g [(vq ℓ) ...] [(x ty) ...] bk))]
   )
 
 ;; borrow same value twice immutably
 (test-equal
  (judgment-holds (fn-ok
                   ,test-ty-prog
-                  (fun test-fn [l0] [(x (~ (struct B (l0))))]
+                  (fun test-fn [(co l0)] [(x (~ (struct B (l0))))]
                        (block l1
                               []
                               [(block l2
@@ -4413,7 +4421,7 @@
 (test-equal
  (judgment-holds (fn-ok
                   ,test-ty-prog
-                  (fun drop-owned-B [l0] [(x (~ (struct B (l0))))]
+                  (fun drop-owned-B [(co l0)] [(x (~ (struct B (l0))))]
                        (block l1
                               []
                               [(drop x)]))))
@@ -4423,7 +4431,7 @@
 (test-equal
  (judgment-holds (fn-ok
                   ,test-ty-prog
-                  (fun drop-owned-B [l0] [(x (~ (struct B (l0))))]
+                  (fun drop-owned-B [(co l0)] [(x (~ (struct B (l0))))]
                        (block l1
                               []
                               []))))
@@ -4433,7 +4441,7 @@
 (test-equal
  (judgment-holds (fn-ok
                   ,test-ty-prog
-                  (fun drop-owned-B [l0] [(x (& l0 imm (struct B (l0))))]
+                  (fun drop-owned-B [(co l0)] [(x (& l0 imm (struct B (l0))))]
                        (block l1
                               []
                               []))))
@@ -4443,7 +4451,7 @@
 (test-equal
  (judgment-holds (fn-ok
                   ,test-ty-prog
-                  (fun test-fn [l0] [(x (~ (struct B (l0))))]
+                  (fun test-fn [(co l0)] [(x (~ (struct B (l0))))]
                        (block l1
                               [(y (& l1 imm (struct B (l0))))]
                               [(y = (& l1 imm (* x)))
@@ -4455,7 +4463,7 @@
 (test-equal
  (judgment-holds (fn-ok
                   ,test-ty-prog
-                  (fun test-fn [l0] [(x (~ (struct B (l0))))]
+                  (fun test-fn [(co l0)] [(x (~ (struct B (l0))))]
                        (block l1
                               []
                               [(block l2
@@ -4470,7 +4478,7 @@
 (test-equal
  (judgment-holds (fn-ok
                   ,test-ty-prog
-                  (fun test-fn [l0] [(x (~ (struct B (l0))))]
+                  (fun test-fn [(co l0)] [(x (~ (struct B (l0))))]
                        (block l1
                               [(y (& l0 mut int))]
                               [(y = ((* x) · 1))
@@ -4482,7 +4490,7 @@
 (test-equal
  (judgment-holds (fn-ok
                   ,test-ty-prog
-                  (fun test-fn [l0] [(x (~ (struct B (l0))))]
+                  (fun test-fn [(co l0)] [(x (~ (struct B (l0))))]
                        (block l1
                               [(y (& l0 mut int))]
                               [(y = ((* x) · 1))
@@ -4498,8 +4506,9 @@
 
 (test-equal
  (judgment-holds (fn-ok ,sum-prog
-                        (fun sum-list [a b] [(inp (& a imm (struct List [])))
-                                             (outp (& b mut int))]
+                        (fun sum-list [(co a) (contra b)] 
+                                      [(inp (& a imm (struct List [])))
+                                       (outp (& b mut int))]
                              (block l0
                                     [(r int)]
                                     [(r = ((* inp) · 0))
@@ -4531,6 +4540,7 @@
 
   [(where (srs [fn ...]) prog)
    (fn-ok prog fn) ...
+   ;; FIXME need to check that struct definitions are ok w/r/t variance
    --------------------------------------------------
    (prog-ok prog)]
   
