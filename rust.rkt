@@ -4550,6 +4550,91 @@
  #t)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; struct-variance-ok
+
+; a particular instantiated lifetime parameter's variance matches its declared variance
+(define-judgment-form
+  Patina-typing
+  #:mode     (struct-parameter-variance-ok I I I)
+  #:contract (struct-parameter-variance-ok ((ℓ vq) ...) vq ℓ)
+
+  [(side-condition (has ℓ any_map))
+   (where vq_0 (get ℓ any_map))
+   ----------------------------------------------
+   (struct-parameter-variance-ok any_map vq_0 ℓ)]
+  )
+
+(test-equal (term (struct-parameter-variance-ok ((ℓ0 co) (ℓ1 contra)) co ℓ0)) #t)
+(test-equal (term (struct-parameter-variance-ok ((ℓ0 co) (ℓ1 contra)) co ℓ1)) #f)
+(test-equal (term (struct-parameter-variance-ok ((ℓ0 co) (ℓ1 contra)) co ℓ2)) #f)
+
+; the sequence of variance declarations in a struct record
+(define-judgment-form
+  Patina-typing
+  #:mode     (struct-parameter-variances I I O)
+  #:contract (struct-parameter-variances srs s (vq ...))
+
+  [(where (_ ... (struct s ((vq _) ...) _ ...) _ ...) srs)
+   -------------------------------------------------------
+   (struct-parameter-variances srs s (vq ...))]
+   )
+
+(test-equal (judgment-holds (struct-parameter-variances ,test-srs A (vq ...)) (vq ...)) '(()))
+(test-equal (judgment-holds (struct-parameter-variances ,test-srs B (vq ...)) (vq ...)) '((co)))
+(test-equal (judgment-holds (struct-parameter-variances ,test-srs C (vq ...)) (vq ...)) '((co)))
+(test-equal (judgment-holds (struct-parameter-variances ,test-srs D (vq ...)) (vq ...)) '((co)))
+
+; helper to process a field
+(define-judgment-form
+  Patina-typing
+  #:mode     (field-variance-ok I I I)
+  #:contract (field-variance-ok srs vℓs ty)
+
+  [----------------------------
+   (field-variance-ok _ _ int)]
+
+  [(field-variance-ok srs vℓs ty)
+   -----------------------------------
+   (field-variance-ok srs vℓs (~ ty))]
+
+  [(field-variance-ok srs vℓs ty)
+   ----------------------------------------
+   (field-variance-ok srs vℓs (& ℓ mq ty))]
+
+  [(field-variance-ok srs vℓs ty)
+   ----------------------------------------
+   (field-variance-ok srs vℓs (Option ty))]
+
+  [(field-variance-ok srs vℓs ty)
+   ------------------------------------------
+   (field-variance-ok srs vℓs (vec ty olen))]
+
+  ; given the variance declarations we know, check that each instantiated parameter matches its declaration
+  [(struct-parameter-variances srs s (vq_p ...))
+   (struct-parameter-variance-ok ((ℓ_e vq_e) ...) vq_p ℓ_p) ...
+   --------------------------------------------------------------
+   (field-variance-ok srs ((vq_e ℓ_e) ...) (struct s (ℓ_p ...)))]
+  )
+
+(test-equal (term (field-variance-ok ,test-srs () int)) #t)
+(test-equal (term (field-variance-ok ,test-srs ((co ℓ0)) (struct B (ℓ0)))) #t)
+(test-equal (term (field-variance-ok ,test-srs ((contra ℓ0)) (struct B (ℓ0)))) #f)
+
+; a struct's variance is ok if any nested structs are ok
+(define-judgment-form
+  Patina-typing
+  #:mode     (struct-variance-ok I I)
+  #:contract (struct-variance-ok srs sr)
+
+  [(field-variance-ok srs vℓs ty) ...
+  --------------------------------------------------
+   (struct-variance-ok srs (struct s vℓs (ty ...)))]
+  )
+
+(test-equal (term (struct-variance-ok ,test-srs (struct F ((contra l0)) ((struct B (l0)))))) #f)
+(test-equal (term (struct-variance-ok ,test-srs (struct F ((co l0)) ((struct B (l0)))))) #t)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; prog-ok
 
 (define-judgment-form
@@ -4559,7 +4644,10 @@
 
   [(where (srs [fn ...]) prog)
    (fn-ok prog fn) ...
-   ;; FIXME need to check that struct definitions are ok w/r/t variance
+   ;; need to check that struct definitions are ok w/r/t variance
+   ;; make sure that lifetimes passed to nested structs have the proper variance
+   (where (sr ...) srs)
+   (struct-variance-ok srs sr) ...
    --------------------------------------------------
    (prog-ok prog)]
   
