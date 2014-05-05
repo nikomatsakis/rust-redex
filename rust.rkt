@@ -2240,65 +2240,85 @@
 
 (define-judgment-form
   Patina-typing
-  #:mode     (subtype I I I)
-  #:contract (subtype Λ ty ty)
+  #:mode     (subtype-variance I I I I)
+  #:contract (subtype-variance Λ vq ℓ ℓ) 
+  ; invariant
+  [--------------------------------
+   (subtype-variance Λ in ℓ_0 ℓ_0)]
 
-  [;; FIXME model variance somehow
-   --------------------------------------------------
-   (subtype Λ (struct s ℓs) (struct s ℓs))]
+  ; covariant
+  [(lifetime-≤ Λ ℓ_1 ℓ_2)
+   --------------------------------
+   (subtype-variance Λ co ℓ_1 ℓ_2)]
 
-  [(subtype Λ ty_1 ty_2)
+  ; contravariant
+  [(lifetime-≤ Λ ℓ_2 ℓ_1)
+   ------------------------------------
+   (subtype-variance Λ contra ℓ_1 ℓ_2)]
+  )
+
+(define-judgment-form
+  Patina-typing
+  #:mode     (subtype I I I I)
+  #:contract (subtype srs Λ ty ty)
+
+  [(where (_ ... (struct s_0 ((vq_0 ℓ_0) ...) _ ...) _ ...) srs)
+   (subtype-variance Λ vq_0 ℓ_1 ℓ_2) ...
+   --------------------------------------------------------------
+   (subtype srs Λ (struct s_0 (ℓ_1 ...)) (struct s_0 (ℓ_2 ...)))]
+
+  [(subtype srs Λ ty_1 ty_2)
    --------------------------------------------------
-   (subtype Λ (~ ty_1) (~ ty_2))]
+   (subtype srs Λ (~ ty_1) (~ ty_2))]
 
   [(lifetime-≤ Λ ℓ_2 ℓ_1)
-   (subtype Λ ty_1 ty_2)
+   (subtype srs Λ ty_1 ty_2)
    --------------------------------------------------
-   (subtype Λ (& ℓ_1 imm ty_1) (& ℓ_2 imm ty_2))]
+   (subtype srs Λ (& ℓ_1 imm ty_1) (& ℓ_2 imm ty_2))]
 
   [(lifetime-≤ Λ ℓ_2 ℓ_1)
    --------------------------------------------------
-   (subtype Λ (& ℓ_1 mut ty) (& ℓ_2 mut ty))]
+   (subtype srs Λ (& ℓ_1 mut ty) (& ℓ_2 mut ty))]
 
   [--------------------------------------------------
-   (subtype Λ int int)]
+   (subtype srs Λ int int)]
 
-  [(subtype Λ ty_1 ty_2)
+  [(subtype srs Λ ty_1 ty_2)
    --------------------------------------------------
-   (subtype Λ (Option ty_1) (Option ty_2))]
+   (subtype srs Λ (Option ty_1) (Option ty_2))]
 
-  [(subtype Λ ty_1 ty_2)
+  [(subtype srs Λ ty_1 ty_2)
    --------------------------------------------------
-   (subtype Λ (vec ty_1 olen) (vec ty_2 olen))]
+   (subtype srs Λ (vec ty_1 olen) (vec ty_2 olen))]
 
   )
 
 (test-equal
- (judgment-holds (subtype ,test-ty-Λ int int))
+ (judgment-holds (subtype ,test-srs ,test-ty-Λ int int))
  #t)
 
 (test-equal
- (judgment-holds (subtype ,test-ty-Λ (& b mut int) (& a mut int)))
+ (judgment-holds (subtype ,test-srs ,test-ty-Λ (& b mut int) (& a mut int)))
  #f)
 
 (test-equal
- (judgment-holds (subtype ,test-ty-Λ (& static mut int) (& a mut int)))
+ (judgment-holds (subtype ,test-srs ,test-ty-Λ (& static mut int) (& a mut int)))
  #t)
 
 (test-equal
- (judgment-holds (subtype ,test-ty-Λ (& a mut int) (& b mut int)))
+ (judgment-holds (subtype ,test-srs ,test-ty-Λ (& a mut int) (& b mut int)))
  #t)
 
 (test-equal
- (judgment-holds (subtype ,test-ty-Λ (Option (& a mut int)) (Option (& b mut int))))
+ (judgment-holds (subtype ,test-srs ,test-ty-Λ (Option (& a mut int)) (Option (& b mut int))))
  #t)
 
 (test-equal
- (judgment-holds (subtype ,test-ty-Λ (~ (& a mut int)) (~ (& b mut int))))
+ (judgment-holds (subtype ,test-srs ,test-ty-Λ (~ (& a mut int)) (~ (& b mut int))))
  #t)
 
 (test-equal
- (judgment-holds (subtype ,test-ty-Λ (vec (& a mut int) 2) (vec (& b mut int) 2)))
+ (judgment-holds (subtype ,test-srs ,test-ty-Λ (vec (& a mut int) 2) (vec (& b mut int) 2)))
  #t)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -3717,7 +3737,7 @@
   [(where [ty_f ...] (field-tys srs s [ℓ ...]))
    (use-lvs-ok srs T Λ £ Δ [lv ...] [ty_a ...] Δ_a)
    (lifetime-in-scope Λ ℓ) ...
-   (subtype Λ ty_a ty_f) ...
+   (subtype srs Λ ty_a ty_f) ...
    --------------------------------------------------
    (rv-ok srs T Λ VL £ Δ (struct s [ℓ ...] [lv ...]) (struct s [ℓ ...]) £ Δ_a)]
 
@@ -3749,7 +3769,7 @@
   [;; check ty well-formed
    (where l (size [lv ...]))
    (use-lvs-ok srs T Λ £ Δ [lv ...] [ty_lv ...] Δ_1)
-   (subtype Λ ty_lv ty) ...
+   (subtype srs Λ ty_lv ty) ...
    --------------------------------------------------
    (rv-ok srs T Λ VL £ Δ (vec ty lv ...) (vec ty l) £ Δ_1)]
 
@@ -3899,14 +3919,14 @@
 
   [(rv-ok srs T Λ VL £ Δ rv ty_rv £_rv Δ_rv)
    (can-init srs T Λ Δ_rv lv)
-   (subtype Λ ty_rv (lvtype srs T lv))
+   (subtype srs Λ ty_rv (lvtype srs T lv))
    (where Δ_lv (initialize-lv Δ_rv lv))
    --------------------------------------------------
    (st-ok (srs fns) T Λ VL £ Δ (lv = rv) £_rv Δ_lv)]
 
   [(rv-ok srs T Λ VL £ Δ rv ty_rv £_rv Δ_rv)
    (can-write-to srs T Λ £_rv Δ_rv lv)
-   (subtype Λ ty_rv (lvtype srs T lv))
+   (subtype srs Λ ty_rv (lvtype srs T lv))
    --------------------------------------------------
    (st-ok (srs fns) T Λ VL £ Δ (lv := rv) £_rv Δ_rv)]
 
@@ -3926,7 +3946,7 @@
    ;; evaluate actual arguments provided
    (use-lvs-ok srs T Λ £ Δ lvs_a [ty_a ...] Δ_a)
    ;; check that each argument is a subtype of the expected type
-   (subtype Λ ty_a (subst-ty θ ty_f)) ...
+   (subtype srs Λ ty_a (subst-ty θ ty_f)) ...
    --------------------------------------------------
    (st-ok (srs fns) T Λ VL £ Δ (call g [ℓ_a ...] lvs_a) £ Δ_a)]
 
