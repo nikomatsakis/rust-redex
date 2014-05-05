@@ -44,7 +44,7 @@
   (ℓs (ℓ ...))
   ;; function def'ns
   (fns (fn ...))
-  (fn (fun g vℓs vdecls bk))
+  (fn (fun g ℓs vdecls bk))
   ;; blocks:
   (bk (block ℓ vdecls sts))
   ;; variable decls
@@ -243,7 +243,7 @@
 ;; simple test prog that assigns to the result pointer
 
 (define twentytwo-main
-  (term (fun main [(co a)] [(outp (& a mut int))]
+  (term (fun main [a] [(outp (& a mut int))]
              (block l0 [] [((* outp) = 22)]))))
 
 (check-not-false (redex-match Patina-machine fn twentytwo-main))
@@ -264,7 +264,7 @@
 (check-not-false (redex-match Patina-machine srs sum-srs))
 
 (define sum-main
-  (term (fun main [(co a)] [(outp (& a mut int))]
+  (term (fun main [a] [(outp (& a mut int))]
              (block l0
                     [(i int)
                      (n (Option (~ (struct List []))))
@@ -305,7 +305,7 @@
 ;;     }
 ;; }
 (define sum-sum-list
-  (term (fun sum-list [(contra a) (co b)] 
+  (term (fun sum-list [a b] 
                       [(inp (& a imm (struct List [])))
                        (outp (& b mut int))]
              (block l0
@@ -349,7 +349,7 @@
 
 ;; gonna be super tedious...
 (define dst-main
-  (term (fun main [(co a)] [(outp (& a mut int))]
+  (term (fun main [a] [(outp (& a mut int))]
              (block l0 [(i1 int)
                         (i2 int)
                         (i3 int)
@@ -663,7 +663,7 @@
   
   [(fun-defn (fn_0 fn_1 ...) g)
    fn_0
-   (where (fun g vℓs ((x ty) ...) bk) fn_0)]
+   (where (fun g ℓs ((x ty) ...) bk) fn_0)]
 
   [(fun-defn (fn_0 fn_1 ...) g)
    (fun-defn (fn_1 ...) g)])
@@ -2068,7 +2068,7 @@
         (where αs_a ,(map (λ (lv) (term (lvaddr srs H V T ,lv)))
                               (term lvs_a)))
         ;; lookup the fun def'n
-        (where (fun g ((vq_f ℓ_f) ...) vdecls_f bk_f) (fun-defn fns g))
+        (where (fun g (ℓ_f ...) vdecls_f bk_f) (fun-defn fns g))
         ; generate a fresh lifetime for the function call
         (where ℓ_fresh (fresh-lifetime-not-on-stack S lX))
         ; substitute the actual lifetimes for the formal lifetimes ...
@@ -2281,7 +2281,7 @@
 
 (define test-ty-srs test-srs)
 (define test-ty-fns
-  (term [(fun drop-owned-B [(co l0)] [(x (~ (struct B (l0))))]
+  (term [(fun drop-owned-B [l0] [(x (~ (struct B (l0))))]
               (block l1
                      []
                      [(drop x)]))
@@ -4059,7 +4059,7 @@
    (st-ok (srs fns) T Λ VL £ Δ (drop lv) £ Δ_1)]
 
   [;; lookup the fun def'n
-   (where (fun g [(vq_f ℓ_f) ...] [(x_f ty_f) ...] bk_f) (fun-defn fns g))
+   (where (fun g [ℓ_f ...] [(x_f ty_f) ...] bk_f) (fun-defn fns g))
    ;; subst from formal lifetime to actual lifetimes
    (where θ [(ℓ_f ℓ_a) ...])
    ;; evaluate actual arguments provided
@@ -4393,19 +4393,18 @@
    (where Λ  [(ℓ []) ...])    ;; FIXME - establish initial relations between lifetimes
    (where VL [[(x ℓ_bk)] ...])
    (bk-ok (srs fns) T Λ VL [] [] bk £ Δ)
-   ;; FIXME check that variance is ok
 
    ;; all parameters must be dropped
    (lv-dropped-if-necessary srs T Δ x) ...
    --------------------------------------------------
-   (fn-ok (srs fns) (fun g [(vq ℓ) ...] [(x ty) ...] bk))]
+   (fn-ok (srs fns) (fun g [ℓ ...] [(x ty) ...] bk))]
   )
 
 ;; borrow same value twice immutably
 (test-equal
  (judgment-holds (fn-ok
                   ,test-ty-prog
-                  (fun test-fn [(co l0)] [(x (~ (struct B (l0))))]
+                  (fun test-fn [l0] [(x (~ (struct B (l0))))]
                        (block l1
                               []
                               [(block l2
@@ -4421,7 +4420,7 @@
 (test-equal
  (judgment-holds (fn-ok
                   ,test-ty-prog
-                  (fun drop-owned-B [(co l0)] [(x (~ (struct B (l0))))]
+                  (fun drop-owned-B [l0] [(x (~ (struct B (l0))))]
                        (block l1
                               []
                               [(drop x)]))))
@@ -4431,7 +4430,7 @@
 (test-equal
  (judgment-holds (fn-ok
                   ,test-ty-prog
-                  (fun drop-owned-B [(co l0)] [(x (~ (struct B (l0))))]
+                  (fun drop-owned-B [l0] [(x (~ (struct B (l0))))]
                        (block l1
                               []
                               []))))
@@ -4441,7 +4440,7 @@
 (test-equal
  (judgment-holds (fn-ok
                   ,test-ty-prog
-                  (fun drop-owned-B [(co l0)] [(x (& l0 imm (struct B (l0))))]
+                  (fun drop-owned-B [l0] [(x (& l0 imm (struct B (l0))))]
                        (block l1
                               []
                               []))))
@@ -4451,7 +4450,7 @@
 (test-equal
  (judgment-holds (fn-ok
                   ,test-ty-prog
-                  (fun test-fn [(co l0)] [(x (~ (struct B (l0))))]
+                  (fun test-fn [l0] [(x (~ (struct B (l0))))]
                        (block l1
                               [(y (& l1 imm (struct B (l0))))]
                               [(y = (& l1 imm (* x)))
@@ -4463,7 +4462,7 @@
 (test-equal
  (judgment-holds (fn-ok
                   ,test-ty-prog
-                  (fun test-fn [(co l0)] [(x (~ (struct B (l0))))]
+                  (fun test-fn [l0] [(x (~ (struct B (l0))))]
                        (block l1
                               []
                               [(block l2
@@ -4478,7 +4477,7 @@
 (test-equal
  (judgment-holds (fn-ok
                   ,test-ty-prog
-                  (fun test-fn [(co l0)] [(x (~ (struct B (l0))))]
+                  (fun test-fn [l0] [(x (~ (struct B (l0))))]
                        (block l1
                               [(y (& l0 mut int))]
                               [(y = ((* x) · 1))
@@ -4490,7 +4489,7 @@
 (test-equal
  (judgment-holds (fn-ok
                   ,test-ty-prog
-                  (fun test-fn [(co l0)] [(x (~ (struct B (l0))))]
+                  (fun test-fn [l0] [(x (~ (struct B (l0))))]
                        (block l1
                               [(y (& l0 mut int))]
                               [(y = ((* x) · 1))
@@ -4506,7 +4505,7 @@
 
 (test-equal
  (judgment-holds (fn-ok ,sum-prog
-                        (fun sum-list [(co a) (contra b)] 
+                        (fun sum-list [a b] 
                                       [(inp (& a imm (struct List [])))
                                        (outp (& b mut int))]
                              (block l0
