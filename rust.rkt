@@ -2170,6 +2170,55 @@
 (check-not-false (redex-match Patina-machine prog test-ty-prog))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; is-true -- a judgment that asserts a metafunction evalutate to true.
+;; necessary since we can't do (side-condition _) ... in judgments.
+
+(define-judgment-form Patina-typing
+  #:mode     (is-true I)
+  #:contract (is-true boolean)
+
+  [--------------
+   (is-true #t)])
+
+(test-equal #t (judgment-holds (is-true (∨ #t #f))))
+(test-equal #f (judgment-holds (is-true (∧ #t #f))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; ty-well-formed
+
+(define-judgment-form Patina-typing
+  #:mode     (ty-well-formed I   I I )
+  #:contract (ty-well-formed srs Λ ty)
+
+  [-----------------------
+   (ty-well-formed _ _ int)]
+
+  [(ty-well-formed srs Λ ty)
+   -------------------------
+   (ty-well-formed srs Λ (~ ty))]
+
+  [(ty-well-formed srs Λ ty)
+   ------------------------------
+   (ty-well-formed srs Λ (Option ty))]
+
+  [(ty-well-formed srs Λ ty)
+   --------------------------------
+   (ty-well-formed srs Λ (vec ty olen))]
+
+  [(where (_ ... (struct s (_ ...) (ty ...)) _ ...) srs) ; struct exists
+   (ty-well-formed srs Λ ty) ... ; field types are well-formed FIXME: necessary?
+   (is-true (has Λ ℓ_a)) ... ; ℓs are in scope
+   -----------------------------------------------------
+   (ty-well-formed srs Λ (struct s (ℓ_a ...)))]
+
+  [(ty-well-formed srs Λ ty)
+   (side-condition (has ℓ Λ)) ; ℓ is in scope
+   ----------------------------------
+   (ty-well-formed srs Λ (& ℓ mq ty))]
+  )
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; lifetime-=, lifetime-≠
 
 (define-metafunction Patina-typing
