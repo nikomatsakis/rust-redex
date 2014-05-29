@@ -2284,6 +2284,20 @@
 (check-not-false (redex-match Patina-machine prog test-ty-prog))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; is-true -- a judgment that asserts a metafunction evalutate to true.
+;; necessary since we can't do (side-condition _) ... in judgments.
+
+(define-judgment-form Patina-typing
+  #:mode     (is-true I)
+  #:contract (is-true boolean)
+
+  [--------------
+   (is-true #t)])
+
+(test-equal #t (judgment-holds (is-true (∨ #t #f))))
+(test-equal #f (judgment-holds (is-true (∧ #t #f))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; lifetime-=, lifetime-≠
 
 (define-metafunction Patina-typing
@@ -2919,6 +2933,49 @@
 (test-equal #t (judgment-holds (ty-bound-by-lifetime ((l0 ()) (l1 (l0))) l1 (& l0 imm int))))
 (test-equal #f (judgment-holds (ty-bound-by-lifetime ((l0 ()) (l1 (l0))) l0 (& l1 imm int))))
 (test-equal #t (judgment-holds (ty-bound-by-lifetime ((l0 ()) (l1 (l0))) l0 (& l0 imm int))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; ty-well-formed
+
+(define-judgment-form Patina-typing
+  #:mode     (ty-well-formed I   I I )
+  #:contract (ty-well-formed srs Λ ty)
+
+  [-----------------------
+   (ty-well-formed _ _ int)]
+
+  [(ty-well-formed srs Λ ty)
+   -------------------------
+   (ty-well-formed srs Λ (~ ty))]
+
+  [(ty-well-formed srs Λ ty)
+   ------------------------------
+   (ty-well-formed srs Λ (Option ty))]
+
+  [(ty-well-formed srs Λ ty)
+   --------------------------------
+   (ty-well-formed srs Λ (vec ty olen))]
+
+  [(where (_ ... (struct s (_ ...) (ty ...)) _ ...) srs) ; struct exists
+   (is-true (has ℓ_a Λ)) ... ; ℓs are in scope
+   ; FIXME: not sure if we need to do more here or
+   ; just add a one-time struct declaration well-fromedness check
+   ; potentially:
+   ; - field types are well-formed after substitution
+   ; - field types outlive lifetime bounds of struct after substitution
+   -----------------------------------------------------
+   (ty-well-formed srs Λ (struct s (ℓ_a ...)))]
+
+  [(ty-well-formed srs Λ ty)
+   (side-condition (has ℓ Λ)) ; ℓ is in scope
+   (ty-bound-by-lifetime Λ ℓ ty) ; referent outlives ℓ
+   ----------------------------------
+   (ty-well-formed srs Λ (& ℓ mq ty))]
+  )
+
+(test-equal (term (ty-well-formed () () (Option (~ int)))) #t)
+(test-equal (term (ty-well-formed () ((la (lb)) (lb ())) (& la mut (& lb mut int)))) #t)
+(test-equal (term (ty-well-formed () ((la ()) (lb (la))) (& la mut (& lb mut int)))) #f)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; unencumbered £ lv
@@ -3873,12 +3930,12 @@
    (rv-ok srs T Λ VL £ Δ (Some lv) (Option ty) £ Δ_1)]
 
   ;; (None ty)
-  [;; FIXME: check ty well-formed
+  [(ty-well-formed srs Λ ty)
    --------------------------------------------------
    (rv-ok srs T Λ VL £ Δ (None ty) (Option ty) £ Δ)]
 
   ;; (vec ty lv ...)
-  [;; check ty well-formed
+  [(ty-well-formed srs Λ ty)
    (where l (len [lv ...]))
    (use-lvs-ok srs T Λ £ Δ [lv ...] [ty_lv ...] Δ_1)
    (subtype Λ ty_lv ty) ...
