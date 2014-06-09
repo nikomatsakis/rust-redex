@@ -2408,6 +2408,10 @@
   )
 
 (test-equal
+ (judgment-holds (subtype ,test-srs ,test-ty-Λ (& a mut int) (& a mut (Option int))))
+ #f)
+
+(test-equal
  (judgment-holds (subtype ,test-srs ,test-ty-Λ int int))
  #t)
 
@@ -4592,41 +4596,80 @@
   (judgment-holds (struct-parameter-variances ,test-srs D (vq ...)) (vq ...)) 
   '((contra)))
 
+; variance xform
+(define-metafunction Patina-typing
+  xform : vq vq -> vq
+  [(xform co vq) vq]
+  [(xform contra co) contra]
+  [(xform contra contra) co]
+  [(xform contra in) in]
+  [(xform in _) in]
+  )
+
+; variance ≤
+(define-judgment-form
+  Patina-typing
+  #:mode     (variance-≤ I I)
+  #:contract (variance-≤ vq vq)
+
+  [------------------
+   (variance-≤ in in)]
+  [------------------
+   (variance-≤ in co)]
+  [----------------------
+   (variance-≤ in contra)]
+  [------------------
+   (variance-≤ co co)]
+  [--------------------------
+   (variance-≤ contra contra)]
+  )
+
 ; helper to process a field
 (define-judgment-form
   Patina-typing
-  #:mode     (field-variance-ok I I I)
-  #:contract (field-variance-ok srs vℓs ty)
+  #:mode     (field-variance-ok I I I I)
+  #:contract (field-variance-ok srs ((ℓ vq) ...) vq ty)
 
-  [----------------------------
-   (field-variance-ok _ _ int)]
+  [-----------------------------
+   (field-variance-ok _ _ _ int)]
 
-  [(field-variance-ok srs vℓs ty)
-   -----------------------------------
-   (field-variance-ok srs vℓs (~ ty))]
+  [(field-variance-ok srs any_lvqs (xform vq co) ty)
+   -------------------------------------------------
+   (field-variance-ok srs any_lvqs vq (~ ty))]
 
-  [(field-variance-ok srs vℓs ty)
-   ----------------------------------------
-   (field-variance-ok srs vℓs (& ℓ mq ty))]
+  [(field-variance-ok srs any_lvqs (xform vq contra) ty)
+   (variance-≤ (get ℓ any_lvqs) (xform vq contra))
+   ------------------------------------------------
+   (field-variance-ok srs any_lvqs vq (& ℓ imm ty))]
 
-  [(field-variance-ok srs vℓs ty)
-   ----------------------------------------
-   (field-variance-ok srs vℓs (Option ty))]
+  [(field-variance-ok srs any_lvqs (xform vq in) ty)
+   (variance-≤ (get ℓ any_lvqs) (xform vq contra))
+   -------------------------------------------------
+   (field-variance-ok srs any_lvqs vq (& ℓ mut ty))]
 
-  [(field-variance-ok srs vℓs ty)
-   ------------------------------------------
-   (field-variance-ok srs vℓs (vec ty olen))]
+  [(field-variance-ok srs any_lvqs (xform vq co) ty)
+   -------------------------------------------------
+   (field-variance-ok srs any_lvqs vq (Option ty))]
 
-  ; given the variance declarations we know, check that each instantiated parameter matches its declaration
-  [(struct-parameter-variances srs s (vq_p ...))
-   (struct-parameter-variance-ok ((ℓ_e vq_e) ...) vq_p ℓ_p) ...
-   --------------------------------------------------------------
-   (field-variance-ok srs ((vq_e ℓ_e) ...) (struct s (ℓ_p ...)))]
+  [(field-variance-ok srs any_lvqs (xform vq co) ty)
+   -------------------------------------------------
+   (field-variance-ok srs any_lvqs vq (vec ty olen))]
+
+  [(struct-parameter-variances srs s (vq_p ...)) ; get declared variances
+   (struct-parameter-variance-ok any_lvqs (xform vq vq_p) ℓ_p) ...
+   ---------------------------------------------------------------
+   (field-variance-ok srs any_lvqs vq (struct s (ℓ_p ...)))]
   )
 
-(test-equal (term (field-variance-ok ,test-srs () int)) #t)
-(test-equal (term (field-variance-ok ,test-srs ((co ℓ0)) (struct B (ℓ0)))) #f)
-(test-equal (term (field-variance-ok ,test-srs ((contra ℓ0)) (struct B (ℓ0)))) #t)
+(test-equal (term (field-variance-ok ,test-srs () co int)) #t)
+(test-equal (term (field-variance-ok ,test-srs ((ℓ0 co)) co (struct B (ℓ0)))) #f)
+(test-equal (term (field-variance-ok ,test-srs ((ℓ0 contra)) co (struct B (ℓ0)))) #t)
+(test-equal #t
+  (term (field-variance-ok () ((l0 contra) (l1 in)) co (& l0 mut (& l1 mut int)))))
+(test-equal #f
+  (term (field-variance-ok () ((l0 contra) (l1 co)) co (& l0 mut (& l1 mut int)))))
+(test-equal #f
+  (term (field-variance-ok () ((l0 contra) (l1 contra)) co (& l0 mut (& l1 mut int)))))
 
 ; a struct's variance is ok if any nested structs are ok
 (define-judgment-form
@@ -4634,13 +4677,17 @@
   #:mode     (struct-variance-ok I I)
   #:contract (struct-variance-ok srs sr)
 
-  [(field-variance-ok srs vℓs ty) ...
+  [(field-variance-ok srs ((ℓ vq) ...) co ty) ...
   --------------------------------------------------
-   (struct-variance-ok srs (struct s vℓs (ty ...)))]
+   (struct-variance-ok srs (struct s ((vq ℓ) ...) (ty ...)))]
   )
 
-(test-equal (term (struct-variance-ok ,test-srs (struct F ((contra l0)) ((struct B (l0)))))) #t)
-(test-equal (term (struct-variance-ok ,test-srs (struct F ((co l0)) ((struct B (l0)))))) #f)
+(test-equal 
+  (term (struct-variance-ok ,test-srs (struct F ((contra l0)) ((struct B (l0)))))) 
+  #t)
+(test-equal 
+  (term (struct-variance-ok ,test-srs (struct F ((co l0)) ((struct B (l0)))))) 
+  #f)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; prog-ok
