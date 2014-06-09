@@ -39,7 +39,7 @@
   (prog (srs fns))
   ;; structures:
   (srs (sr ...))
-  (sr (struct s ℓs (ty ...)))
+  (sr (struct s vℓs (ty ...)))
   ;; lifetimes:
   (ℓs (ℓ ...))
   ;; function def'ns
@@ -91,6 +91,12 @@
   ;; mq : mutability qualifier
   (mq mut imm)
   (mqs [mq ...])
+  ;; variance qualifier
+  (vq co      ; covariant
+      contra  ; contravariant
+      in)     ; invariant
+  (vℓ (vq ℓ))
+  (vℓs (vℓ ...))
   ;; variables
   (x variable-not-otherwise-mentioned)
   ;; function names
@@ -146,13 +152,13 @@
 
 (define test-srs
   (term [(struct A () (int))
-         (struct B (l0) (int (& l0 mut int)))
-         (struct C (l0) ((struct A ())
-                         (struct B (l0))))
-         (struct D (l0) ((struct C (l0))
-                         (struct A ())
-                         (struct C (l0))
-                         (struct B (l0))))
+         (struct B ((co l0)) (int (& l0 mut int)))
+         (struct C ((co l0)) ((struct A ())
+                              (struct B (l0))))
+         (struct D ((co l0)) ((struct C (l0))
+                              (struct A ())
+                              (struct C (l0))
+                              (struct B (l0))))
          (struct E () [(~ int)])
          ]))
 
@@ -224,9 +230,9 @@
 
 (define test-dst-srs
   (term [(struct RCDataInt3 () [int (vec int 3)])
-         (struct RCInt3 (l0) [(& l0 imm (struct RCDataInt3 []))])
+         (struct RCInt3 ((co l0)) [(& l0 imm (struct RCDataInt3 []))])
          (struct RCDataIntN () (int (vec int erased)))
-         (struct RCIntN (l0) [(& l0 imm (struct RCDataIntN []))])
+         (struct RCIntN ((co l0)) [(& l0 imm (struct RCDataIntN []))])
          (struct Cycle1 () [(Option (~ (struct Cycle []))) (vec int erased)])
          (struct Cycle2 () [(Option (~ (struct Cycle [])))])
          ]))
@@ -299,8 +305,9 @@
 ;;     }
 ;; }
 (define sum-sum-list
-  (term (fun sum-list [a b] [(inp (& a imm (struct List [])))
-                             (outp (& b mut int))]
+  (term (fun sum-list [a b] 
+                      [(inp (& a imm (struct List [])))
+                       (outp (& b mut int))]
              (block l0
                     [(r int)]
                     [(r = ((* inp) · 0))
@@ -335,9 +342,9 @@
 
 (define dst-srs
   (term [(struct RCDataInt3 () [int (vec int 3)])
-         (struct RCInt3 (l0) [(& l0 imm (struct RCDataInt3 []))])
+         (struct RCInt3 ((co l0)) [(& l0 imm (struct RCDataInt3 []))])
          (struct RCDataIntN () (int (vec int erased)))
-         (struct RCIntN (l0) [(& l0 imm (struct RCDataIntN []))])
+         (struct RCIntN ((co l0)) [(& l0 imm (struct RCDataIntN []))])
          ]))
 
 ;; gonna be super tedious...
@@ -431,7 +438,7 @@
   ∧ : boolean boolean -> boolean
 
   [(∧ #t #t) #t]
-  [(∧ boolean boolean) #f]
+  [(∧ _ _) #f]
   )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -964,11 +971,11 @@
 (define-metafunction Patina-machine
   field-tys : srs s ℓs -> (ty ...)
   
-  [(field-tys ((struct s_0 (ℓ_0 ...) (ty_0 ...)) sr ...) s_0 [ℓ_1 ...])
+  [(field-tys ((struct s_0 ((_ ℓ_0) ...) (ty_0 ...)) sr ...) s_0 [ℓ_1 ...])
    ((subst-ty θ ty_0) ...)
    (where θ [(ℓ_0 ℓ_1) ...])]
 
-  [(field-tys ((struct s_0 (ℓ_0 ...) (ty_0 ...)) sr ...) s_1 ℓs_1)
+  [(field-tys ((struct s_0 ((_ ℓ_0) ...) (ty_0 ...)) sr ...) s_1 ℓs_1)
    (field-tys (sr ...) s_1 ℓs_1)])
 
 (test-equal (term (field-tys ,test-srs A ()))
@@ -2280,7 +2287,7 @@
 ;;    let i: int;
 ;;    'b: {
 ;;      let r-imm-B: &'b B<'static>;
-;;      let r-mut-B: &'b B<'static>;
+;;      let r-mut-B: &'b mut B<'static>;
 ;;      let owned-B: ~B<'static>;
 ;;      let owned-E: ~E;
 ;;      let r-mut-int: &'a mut int
@@ -2324,6 +2331,55 @@
 (define test-ty-prog (term (,test-ty-srs ,test-ty-fns)))
 
 (check-not-false (redex-match Patina-machine prog test-ty-prog))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; is-true -- a judgment that asserts a metafunction evalutate to true.
+;; necessary since we can't do (side-condition _) ... in judgments.
+
+(define-judgment-form Patina-typing
+  #:mode     (is-true I)
+  #:contract (is-true boolean)
+
+  [--------------
+   (is-true #t)])
+
+(test-equal #t (judgment-holds (is-true (∨ #t #f))))
+(test-equal #f (judgment-holds (is-true (∧ #t #f))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; ty-well-formed
+
+(define-judgment-form Patina-typing
+  #:mode     (ty-well-formed I   I I )
+  #:contract (ty-well-formed srs Λ ty)
+
+  [-----------------------
+   (ty-well-formed _ _ int)]
+
+  [(ty-well-formed srs Λ ty)
+   -------------------------
+   (ty-well-formed srs Λ (~ ty))]
+
+  [(ty-well-formed srs Λ ty)
+   ------------------------------
+   (ty-well-formed srs Λ (Option ty))]
+
+  [(ty-well-formed srs Λ ty)
+   --------------------------------
+   (ty-well-formed srs Λ (vec ty olen))]
+
+  [(where (_ ... (struct s (_ ...) (ty ...)) _ ...) srs) ; struct exists
+   (ty-well-formed srs Λ ty) ... ; field types are well-formed FIXME: necessary?
+   (is-true (has Λ ℓ_a)) ... ; ℓs are in scope
+   -----------------------------------------------------
+   (ty-well-formed srs Λ (struct s (ℓ_a ...)))]
+
+  [(ty-well-formed srs Λ ty)
+   (side-condition (has ℓ Λ)) ; ℓ is in scope
+   ----------------------------------
+   (ty-well-formed srs Λ (& ℓ mq ty))]
+  )
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; lifetime-=, lifetime-≠
@@ -2389,65 +2445,85 @@
 
 (define-judgment-form
   Patina-typing
-  #:mode     (subtype I I I)
-  #:contract (subtype Λ ty ty)
+  #:mode     (subtype-variance I I I I)
+  #:contract (subtype-variance Λ vq ℓ ℓ) 
+  ; invariant
+  [--------------------------------
+   (subtype-variance Λ in ℓ_0 ℓ_0)]
 
-  [;; FIXME model variance somehow
-   --------------------------------------------------
-   (subtype Λ (struct s ℓs) (struct s ℓs))]
+  ; covariant
+  [(lifetime-≤ Λ ℓ_1 ℓ_2)
+   --------------------------------
+   (subtype-variance Λ co ℓ_1 ℓ_2)]
 
-  [(subtype Λ ty_1 ty_2)
+  ; contravariant
+  [(lifetime-≤ Λ ℓ_2 ℓ_1)
+   ------------------------------------
+   (subtype-variance Λ contra ℓ_1 ℓ_2)]
+  )
+
+(define-judgment-form
+  Patina-typing
+  #:mode     (subtype I I I I)
+  #:contract (subtype srs Λ ty ty)
+
+  [(where (_ ... (struct s_0 ((vq_0 ℓ_0) ...) _ ...) _ ...) srs)
+   (subtype-variance Λ vq_0 ℓ_1 ℓ_2) ...
+   --------------------------------------------------------------
+   (subtype srs Λ (struct s_0 (ℓ_1 ...)) (struct s_0 (ℓ_2 ...)))]
+
+  [(subtype srs Λ ty_1 ty_2)
    --------------------------------------------------
-   (subtype Λ (~ ty_1) (~ ty_2))]
+   (subtype srs Λ (~ ty_1) (~ ty_2))]
 
   [(lifetime-≤ Λ ℓ_2 ℓ_1)
-   (subtype Λ ty_1 ty_2)
+   (subtype srs Λ ty_1 ty_2)
    --------------------------------------------------
-   (subtype Λ (& ℓ_1 imm ty_1) (& ℓ_2 imm ty_2))]
+   (subtype srs Λ (& ℓ_1 imm ty_1) (& ℓ_2 imm ty_2))]
 
   [(lifetime-≤ Λ ℓ_2 ℓ_1)
    --------------------------------------------------
-   (subtype Λ (& ℓ_1 mut ty) (& ℓ_2 mut ty))]
+   (subtype srs Λ (& ℓ_1 mut ty) (& ℓ_2 mut ty))]
 
   [--------------------------------------------------
-   (subtype Λ int int)]
+   (subtype srs Λ int int)]
 
-  [(subtype Λ ty_1 ty_2)
+  [(subtype srs Λ ty_1 ty_2)
    --------------------------------------------------
-   (subtype Λ (Option ty_1) (Option ty_2))]
+   (subtype srs Λ (Option ty_1) (Option ty_2))]
 
-  [(subtype Λ ty_1 ty_2)
+  [(subtype srs Λ ty_1 ty_2)
    --------------------------------------------------
-   (subtype Λ (vec ty_1 olen) (vec ty_2 olen))]
+   (subtype srs Λ (vec ty_1 olen) (vec ty_2 olen))]
 
   )
 
 (test-equal
- (judgment-holds (subtype ,test-ty-Λ int int))
+ (judgment-holds (subtype ,test-srs ,test-ty-Λ int int))
  #t)
 
 (test-equal
- (judgment-holds (subtype ,test-ty-Λ (& b mut int) (& a mut int)))
+ (judgment-holds (subtype ,test-srs ,test-ty-Λ (& b mut int) (& a mut int)))
  #f)
 
 (test-equal
- (judgment-holds (subtype ,test-ty-Λ (& static mut int) (& a mut int)))
+ (judgment-holds (subtype ,test-srs ,test-ty-Λ (& static mut int) (& a mut int)))
  #t)
 
 (test-equal
- (judgment-holds (subtype ,test-ty-Λ (& a mut int) (& b mut int)))
+ (judgment-holds (subtype ,test-srs ,test-ty-Λ (& a mut int) (& b mut int)))
  #t)
 
 (test-equal
- (judgment-holds (subtype ,test-ty-Λ (Option (& a mut int)) (Option (& b mut int))))
+ (judgment-holds (subtype ,test-srs ,test-ty-Λ (Option (& a mut int)) (Option (& b mut int))))
  #t)
 
 (test-equal
- (judgment-holds (subtype ,test-ty-Λ (~ (& a mut int)) (~ (& b mut int))))
+ (judgment-holds (subtype ,test-srs ,test-ty-Λ (~ (& a mut int)) (~ (& b mut int))))
  #t)
 
 (test-equal
- (judgment-holds (subtype ,test-ty-Λ (vec (& a mut int) 2) (vec (& b mut int) 2)))
+ (judgment-holds (subtype ,test-srs ,test-ty-Λ (vec (& a mut int) 2) (vec (& b mut int) 2)))
  #t)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -2924,18 +3000,43 @@
 ;;
 ;; If this judgement holds, then the type `ty` is bound by the
 ;; lifetime ℓ.
-;;
-;; FIXME
 
 (define-judgment-form
   Patina-typing
   #:mode     (ty-bound-by-lifetime I I I )
   #:contract (ty-bound-by-lifetime Λ ℓ ty)
 
-  [--------------------------------------------------
-   (ty-bound-by-lifetime Λ ℓ ty)]
+  [------------------------------
+   (ty-bound-by-lifetime Λ ℓ int)]
 
+  [(ty-bound-by-lifetime Λ ℓ ty)
+   --------------------------------------
+   (ty-bound-by-lifetime Λ ℓ (Option ty))]
+
+  [(ty-bound-by-lifetime Λ ℓ ty)
+   ----------------------------------------
+   (ty-bound-by-lifetime Λ ℓ (vec ty olen))]
+
+  [(ty-bound-by-lifetime Λ ℓ ty)
+   ---------------------------------
+   (ty-bound-by-lifetime Λ ℓ (~ ty))]
+
+  [(lifetime-≤ Λ ℓ_0 ℓ_1) ; ℓ_1 cannot be shorter than ℓ_0
+   (ty-bound-by-lifetime Λ ℓ_0 ty)
+   ------------------------------------------
+   (ty-bound-by-lifetime Λ ℓ_0 (& ℓ_1 mq ty))]
+
+  [(lifetime-≤ Λ ℓ_0 ℓ_1) ... ; ℓ_1s cannot be shorter than ℓ_0
+   ; all the fields in s are bounded by the lifetime parameters
+   ; thus, if the lifetimes all outlive ℓ_0, then so too do the fields
+   -------------------------------------------------
+   (ty-bound-by-lifetime Λ ℓ_0 (struct s (ℓ_1 ...)))]
   )
+
+(test-equal #t (judgment-holds (ty-bound-by-lifetime ((l0 ()) (l1 (l0))) l1 (& l1 imm int))))
+(test-equal #t (judgment-holds (ty-bound-by-lifetime ((l0 ()) (l1 (l0))) l1 (& l0 imm int))))
+(test-equal #f (judgment-holds (ty-bound-by-lifetime ((l0 ()) (l1 (l0))) l0 (& l1 imm int))))
+(test-equal #t (judgment-holds (ty-bound-by-lifetime ((l0 ()) (l1 (l0))) l0 (& l0 imm int))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; unencumbered £ lv
@@ -3866,7 +3967,7 @@
   [(where [ty_f ...] (field-tys srs s [ℓ ...]))
    (use-lvs-ok srs T Λ £ Δ [lv ...] [ty_a ...] Δ_a)
    (lifetime-in-scope Λ ℓ) ...
-   (subtype Λ ty_a ty_f) ...
+   (subtype srs Λ ty_a ty_f) ...
    --------------------------------------------------
    (rv-ok srs T Λ VL £ Δ (struct s [ℓ ...] [lv ...]) (struct s [ℓ ...]) £ Δ_a)]
 
@@ -3898,7 +3999,7 @@
   [;; FIXME: check ty well-formed
    (where l (size [lv ...]))
    (use-lvs-ok srs T Λ £ Δ [lv ...] [ty_lv ...] Δ_1)
-   (subtype Λ ty_lv ty) ...
+   (subtype srs Λ ty_lv ty) ...
    --------------------------------------------------
    (rv-ok srs T Λ VL £ Δ (vec ty lv ...) (vec ty l) £ Δ_1)]
 
@@ -4048,14 +4149,14 @@
 
   [(rv-ok srs T Λ VL £ Δ rv ty_rv £_rv Δ_rv)
    (can-init srs T Λ Δ_rv lv)
-   (subtype Λ ty_rv (lvtype srs T lv))
+   (subtype srs Λ ty_rv (lvtype srs T lv))
    (where Δ_lv (initialize-lv Δ_rv lv))
    --------------------------------------------------
    (st-ok (srs fns) T Λ VL £ Δ (lv = rv) £_rv Δ_lv)]
 
   [(rv-ok srs T Λ VL £ Δ rv ty_rv £_rv Δ_rv)
    (can-write-to srs T Λ £_rv Δ_rv lv)
-   (subtype Λ ty_rv (lvtype srs T lv))
+   (subtype srs Λ ty_rv (lvtype srs T lv))
    --------------------------------------------------
    (st-ok (srs fns) T Λ VL £ Δ (lv := rv) £_rv Δ_rv)]
 
@@ -4075,7 +4176,7 @@
    ;; evaluate actual arguments provided
    (use-lvs-ok srs T Λ £ Δ lvs_a [ty_a ...] Δ_a)
    ;; check that each argument is a subtype of the expected type
-   (subtype Λ ty_a (subst-ty θ ty_f)) ...
+   (subtype srs Λ ty_a (subst-ty θ ty_f)) ...
    --------------------------------------------------
    (st-ok (srs fns) T Λ VL £ Δ (call g [ℓ_a ...] lvs_a) £ Δ_a)]
 
@@ -4515,8 +4616,9 @@
 
 (test-equal
  (judgment-holds (fn-ok ,sum-prog
-                        (fun sum-list [a b] [(inp (& a imm (struct List [])))
-                                             (outp (& b mut int))]
+                        (fun sum-list [a b] 
+                                      [(inp (& a imm (struct List [])))
+                                       (outp (& b mut int))]
                              (block l0
                                     [(r int)]
                                     [(r = ((* inp) · 0))
@@ -4539,6 +4641,91 @@
  #t)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; struct-variance-ok
+
+; a particular instantiated lifetime parameter's variance matches its declared variance
+(define-judgment-form
+  Patina-typing
+  #:mode     (struct-parameter-variance-ok I I I)
+  #:contract (struct-parameter-variance-ok ((ℓ vq) ...) vq ℓ)
+
+  [(side-condition (has ℓ any_map))
+   (where vq_0 (get ℓ any_map))
+   ----------------------------------------------
+   (struct-parameter-variance-ok any_map vq_0 ℓ)]
+  )
+
+(test-equal (term (struct-parameter-variance-ok ((ℓ0 co) (ℓ1 contra)) co ℓ0)) #t)
+(test-equal (term (struct-parameter-variance-ok ((ℓ0 co) (ℓ1 contra)) co ℓ1)) #f)
+(test-equal (term (struct-parameter-variance-ok ((ℓ0 co) (ℓ1 contra)) co ℓ2)) #f)
+
+; the sequence of variance declarations in a struct record
+(define-judgment-form
+  Patina-typing
+  #:mode     (struct-parameter-variances I I O)
+  #:contract (struct-parameter-variances srs s (vq ...))
+
+  [(where (_ ... (struct s ((vq _) ...) _ ...) _ ...) srs)
+   -------------------------------------------------------
+   (struct-parameter-variances srs s (vq ...))]
+   )
+
+(test-equal (judgment-holds (struct-parameter-variances ,test-srs A (vq ...)) (vq ...)) '(()))
+(test-equal (judgment-holds (struct-parameter-variances ,test-srs B (vq ...)) (vq ...)) '((co)))
+(test-equal (judgment-holds (struct-parameter-variances ,test-srs C (vq ...)) (vq ...)) '((co)))
+(test-equal (judgment-holds (struct-parameter-variances ,test-srs D (vq ...)) (vq ...)) '((co)))
+
+; helper to process a field
+(define-judgment-form
+  Patina-typing
+  #:mode     (field-variance-ok I I I)
+  #:contract (field-variance-ok srs vℓs ty)
+
+  [----------------------------
+   (field-variance-ok _ _ int)]
+
+  [(field-variance-ok srs vℓs ty)
+   -----------------------------------
+   (field-variance-ok srs vℓs (~ ty))]
+
+  [(field-variance-ok srs vℓs ty)
+   ----------------------------------------
+   (field-variance-ok srs vℓs (& ℓ mq ty))]
+
+  [(field-variance-ok srs vℓs ty)
+   ----------------------------------------
+   (field-variance-ok srs vℓs (Option ty))]
+
+  [(field-variance-ok srs vℓs ty)
+   ------------------------------------------
+   (field-variance-ok srs vℓs (vec ty olen))]
+
+  ; given the variance declarations we know, check that each instantiated parameter matches its declaration
+  [(struct-parameter-variances srs s (vq_p ...))
+   (struct-parameter-variance-ok ((ℓ_e vq_e) ...) vq_p ℓ_p) ...
+   --------------------------------------------------------------
+   (field-variance-ok srs ((vq_e ℓ_e) ...) (struct s (ℓ_p ...)))]
+  )
+
+(test-equal (term (field-variance-ok ,test-srs () int)) #t)
+(test-equal (term (field-variance-ok ,test-srs ((co ℓ0)) (struct B (ℓ0)))) #t)
+(test-equal (term (field-variance-ok ,test-srs ((contra ℓ0)) (struct B (ℓ0)))) #f)
+
+; a struct's variance is ok if any nested structs are ok
+(define-judgment-form
+  Patina-typing
+  #:mode     (struct-variance-ok I I)
+  #:contract (struct-variance-ok srs sr)
+
+  [(field-variance-ok srs vℓs ty) ...
+  --------------------------------------------------
+   (struct-variance-ok srs (struct s vℓs (ty ...)))]
+  )
+
+(test-equal (term (struct-variance-ok ,test-srs (struct F ((contra l0)) ((struct B (l0)))))) #f)
+(test-equal (term (struct-variance-ok ,test-srs (struct F ((co l0)) ((struct B (l0)))))) #t)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; prog-ok
 
 (define-judgment-form
@@ -4548,6 +4735,10 @@
 
   [(where (srs [fn ...]) prog)
    (fn-ok prog fn) ...
+   ;; need to check that struct definitions are ok w/r/t variance
+   ;; make sure that lifetimes passed to nested structs have the proper variance
+   (where (sr ...) srs)
+   (struct-variance-ok srs sr) ...
    --------------------------------------------------
    (prog-ok prog)]
   
