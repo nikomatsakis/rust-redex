@@ -152,13 +152,13 @@
 
 (define test-srs
   (term [(struct A () (int))
-         (struct B ((co l0)) (int (& l0 mut int)))
-         (struct C ((co l0)) ((struct A ())
-                              (struct B (l0))))
-         (struct D ((co l0)) ((struct C (l0))
-                              (struct A ())
-                              (struct C (l0))
-                              (struct B (l0))))
+         (struct B ((contra l0)) (int (& l0 mut int)))
+         (struct C ((contra l0)) ((struct A ())
+                                  (struct B (l0))))
+         (struct D ((contra l0)) ((struct C (l0))
+                                  (struct A ())
+                                  (struct C (l0))
+                                  (struct B (l0))))
          (struct E () [(~ int)])
          ]))
 
@@ -4579,10 +4579,18 @@
    (struct-parameter-variances srs s (vq ...))]
    )
 
-(test-equal (judgment-holds (struct-parameter-variances ,test-srs A (vq ...)) (vq ...)) '(()))
-(test-equal (judgment-holds (struct-parameter-variances ,test-srs B (vq ...)) (vq ...)) '((co)))
-(test-equal (judgment-holds (struct-parameter-variances ,test-srs C (vq ...)) (vq ...)) '((co)))
-(test-equal (judgment-holds (struct-parameter-variances ,test-srs D (vq ...)) (vq ...)) '((co)))
+(test-equal 
+  (judgment-holds (struct-parameter-variances ,test-srs A (vq ...)) (vq ...)) 
+  '(()))
+(test-equal 
+  (judgment-holds (struct-parameter-variances ,test-srs B (vq ...)) (vq ...)) 
+  '((contra)))
+(test-equal 
+  (judgment-holds (struct-parameter-variances ,test-srs C (vq ...)) (vq ...)) 
+  '((contra)))
+(test-equal 
+  (judgment-holds (struct-parameter-variances ,test-srs D (vq ...)) (vq ...)) 
+  '((contra)))
 
 ; helper to process a field
 (define-judgment-form
@@ -4617,8 +4625,8 @@
   )
 
 (test-equal (term (field-variance-ok ,test-srs () int)) #t)
-(test-equal (term (field-variance-ok ,test-srs ((co ℓ0)) (struct B (ℓ0)))) #t)
-(test-equal (term (field-variance-ok ,test-srs ((contra ℓ0)) (struct B (ℓ0)))) #f)
+(test-equal (term (field-variance-ok ,test-srs ((co ℓ0)) (struct B (ℓ0)))) #f)
+(test-equal (term (field-variance-ok ,test-srs ((contra ℓ0)) (struct B (ℓ0)))) #t)
 
 ; a struct's variance is ok if any nested structs are ok
 (define-judgment-form
@@ -4631,8 +4639,8 @@
    (struct-variance-ok srs (struct s vℓs (ty ...)))]
   )
 
-(test-equal (term (struct-variance-ok ,test-srs (struct F ((contra l0)) ((struct B (l0)))))) #f)
-(test-equal (term (struct-variance-ok ,test-srs (struct F ((co l0)) ((struct B (l0)))))) #t)
+(test-equal (term (struct-variance-ok ,test-srs (struct F ((contra l0)) ((struct B (l0)))))) #t)
+(test-equal (term (struct-variance-ok ,test-srs (struct F ((co l0)) ((struct B (l0)))))) #f)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; prog-ok
