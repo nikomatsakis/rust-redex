@@ -4555,22 +4555,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; struct-variance-ok
 
-; a particular instantiated lifetime parameter's variance matches its declared variance
-(define-judgment-form
-  Patina-typing
-  #:mode     (struct-parameter-variance-ok I I I)
-  #:contract (struct-parameter-variance-ok ((ℓ vq) ...) vq ℓ)
-
-  [(side-condition (has ℓ any_map))
-   (where vq_0 (get ℓ any_map))
-   ----------------------------------------------
-   (struct-parameter-variance-ok any_map vq_0 ℓ)]
-  )
-
-(test-equal (term (struct-parameter-variance-ok ((ℓ0 co) (ℓ1 contra)) co ℓ0)) #t)
-(test-equal (term (struct-parameter-variance-ok ((ℓ0 co) (ℓ1 contra)) co ℓ1)) #f)
-(test-equal (term (struct-parameter-variance-ok ((ℓ0 co) (ℓ1 contra)) co ℓ2)) #f)
-
 ; the sequence of variance declarations in a struct record
 (define-judgment-form
   Patina-typing
@@ -4655,7 +4639,7 @@
    (field-variance-ok srs any_lvqs vq (vec ty olen))]
 
   [(struct-parameter-variances srs s (vq_p ...)) ; get declared variances
-   (struct-parameter-variance-ok any_lvqs (xform vq vq_p) ℓ_p) ...
+   (variance-≤ (get ℓ_p any_lvqs) (xform vq vq_p)) ...
    ---------------------------------------------------------------
    (field-variance-ok srs any_lvqs vq (struct s (ℓ_p ...)))]
   )
