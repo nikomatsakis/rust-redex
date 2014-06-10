@@ -2353,21 +2353,21 @@
 
 (define-judgment-form
   Patina-typing
-  #:mode     (subtype-variance I I I I)
-  #:contract (subtype-variance Λ vq ℓ ℓ)
+  #:mode     (sublifetime I I I I)
+  #:contract (sublifetime Λ vq ℓ ℓ)
   ; invariant
   [--------------------------------
-   (subtype-variance Λ in ℓ_0 ℓ_0)]
+   (sublifetime Λ in ℓ_0 ℓ_0)]
 
   ; covariant
   [(lifetime-≤ Λ ℓ_1 ℓ_2)
    --------------------------------
-   (subtype-variance Λ co ℓ_1 ℓ_2)]
+   (sublifetime Λ co ℓ_1 ℓ_2)]
 
   ; contravariant
   [(lifetime-≤ Λ ℓ_2 ℓ_1)
    ------------------------------------
-   (subtype-variance Λ contra ℓ_1 ℓ_2)]
+   (sublifetime Λ contra ℓ_1 ℓ_2)]
   )
 
 (define-judgment-form
@@ -2376,7 +2376,7 @@
   #:contract (subtype srs Λ ty ty)
 
   [(where (_ ... (struct s_0 ((vq_0 ℓ_0) ...) _ ...) _ ...) srs)
-   (subtype-variance Λ vq_0 ℓ_1 ℓ_2) ...
+   (sublifetime Λ vq_0 ℓ_1 ℓ_2) ...
    --------------------------------------------------------------
    (subtype srs Λ (struct s_0 (ℓ_1 ...)) (struct s_0 (ℓ_2 ...)))]
 
