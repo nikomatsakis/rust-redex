@@ -4636,7 +4636,7 @@
    -------------------------------------------------
    (field-variance-ok srs any_lvqs vq (~ ty))]
 
-  [(field-variance-ok srs any_lvqs (xform vq contra) ty)
+  [(field-variance-ok srs any_lvqs (xform vq co) ty)
    (variance-≤ (get ℓ any_lvqs) (xform vq contra))
    ------------------------------------------------
    (field-variance-ok srs any_lvqs vq (& ℓ imm ty))]
