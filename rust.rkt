@@ -29,6 +29,8 @@
 ;; FIXME - check that local variables types are bounded by their lifetime
 ;;
 ;; FIXME - add in relationships between lifetime parameters that we can infer from types
+;;
+;; FIXME - Add explicit ordering constraints on lifetimes and use in well-formedness checks
 
 #lang racket
 
