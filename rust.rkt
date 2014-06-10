@@ -80,7 +80,7 @@
       (pack lv ty)                 ;; convert fixed-length to DST
       )
   (mode (ref ℓ mq) by-value)
-  ;; types : 
+  ;; types :
   (tys (ty ...))
   (ty (struct s ℓs)             ;; s<'ℓ...>
       (~ ty)                       ;; ~t
@@ -305,7 +305,7 @@
 ;;     }
 ;; }
 (define sum-sum-list
-  (term (fun sum-list [a b] 
+  (term (fun sum-list [a b]
                       [(inp (& a imm (struct List [])))
                        (outp (& b mut int))]
              (block l0
@@ -610,7 +610,7 @@
 
 (define-metafunction Patina-machine
   prefix-sum : z zs -> zs
-  
+
   [(prefix-sum z_a ()) ()]
   [(prefix-sum z_a (z_b z_c ...))
    [z_d z_e ...]
@@ -656,11 +656,11 @@
 (test-equal (term (deref [(2 (ptr 23)) (1 (int 22))] 1)) (term (int 22)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; fun-defn -- 
+;; fun-defn --
 
 (define-metafunction Patina-machine
   fun-defn : fns g -> fn
-  
+
   [(fun-defn (fn_0 fn_1 ...) g)
    fn_0
    (where (fun g ℓs ((x ty) ...) bk) fn_0)]
@@ -676,7 +676,7 @@
 
 (define-metafunction Patina-machine
   update : H α hv -> H
-  
+
   [(update ((α_0 hv_0) (α_1 hv_1) ...) α_0 hv_2)
    ((α_0 hv_2) (α_1 hv_1) ...)]
 
@@ -690,11 +690,11 @@
             (term ((2 (int 23)) (1 (int 22)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; extend -- grows a heap with z contiguous new addresses 
+;; extend -- grows a heap with z contiguous new addresses
 
 (define-metafunction Patina-machine
   extend : H α z -> H
-  
+
   [(extend H α 0) H]
 
   [(extend ((β hv) ...) α z)
@@ -719,7 +719,7 @@
 
 (define-metafunction Patina-machine
   shrink : H α z -> H
-  
+
   [(shrink H α z)
    ,(filter (λ (pair) (not (in-range (car pair) (term α) (term z))))
             (term H))])
@@ -769,7 +769,7 @@
 
   [(subst-ty θ (Option ty))
    (Option (subst-ty θ ty))]
-  
+
   [(subst-ty θ (vec ty olen))
    (vec (subst-ty θ ty) olen)]
   )
@@ -864,7 +864,7 @@
 
   [(subst-st θ (call g (ℓ ...) lvs))
    (call g ((subst-ℓ θ ℓ) ...) lvs)]
-  
+
   [(subst-st θ (match lv (Some mode x => bk_1) (None => bk_2)))
    (match lv (Some (subst-mode θ mode) x => (subst-bk θ bk_1)) (None => (subst-bk θ bk_2)))]
 
@@ -904,14 +904,14 @@
   (term (subst-st ((a b)) (block c ((x (& d imm int))) ((y = (vec (& a imm int) x))))))
   (term (block c ((x (& d imm int))) ((y = (vec (& b imm int) x))))))
 ; avoid capture
-(test-equal 
-  (term (subst-st ((a b) (b c)) 
-                  (block a ((x (& a imm int))) ((y = (vec (& b imm int) x)))))) 
+(test-equal
+  (term (subst-st ((a b) (b c))
+                  (block a ((x (& a imm int))) ((y = (vec (& b imm int) x))))))
   (term           (block a ((x (& a imm int))) ((y = (vec (& c imm int) x))))))
 ; a case where we actually need to use a different name
-(test-equal 
-  (term (subst-st ((a b) (b c)) 
-                  (block c  ((x (& a imm int)) (y (& b imm int))) ((y = (vec (& c  imm int) x)))))) 
+(test-equal
+  (term (subst-st ((a b) (b c))
+                  (block c  ((x (& a imm int)) (y (& b imm int))) ((y = (vec (& c  imm int) x))))))
   (term           (block c1 ((x (& b imm int)) (y (& c imm int))) ((y = (vec (& c1 imm int) x))))))
 
 (test-equal
@@ -928,7 +928,7 @@
 
 (define-metafunction Patina-machine
   field-tys : srs s ℓs -> (ty ...)
-  
+
   [(field-tys ((struct s_0 ((_ ℓ_0) ...) (ty_0 ...)) sr ...) s_0 [ℓ_1 ...])
    ((subst-ty θ ty_0) ...)
    (where θ [(ℓ_0 ℓ_1) ...])]
@@ -994,26 +994,26 @@
 
 (define-metafunction Patina-machine
   sizeof : srs ty -> z
-  
-  [(sizeof srs int) 
+
+  [(sizeof srs int)
    1]
-  
+
   [(sizeof srs (~ ty))
    1
    (side-condition (not (term (is-DST srs ty))))]
-  
+
   [(sizeof srs (~ ty))
    2
    (side-condition (term (is-DST srs ty)))]
-  
+
   [(sizeof srs (& ℓ mq ty))
    1
    (side-condition (not (term (is-DST srs ty))))]
-  
+
   [(sizeof srs (& ℓ mq ty))
    2
    (side-condition (term (is-DST srs ty)))]
-  
+
   [(sizeof srs (struct s ℓs))
    (sum [(sizeof srs ty) ...])
    (where [ty ...] (field-tys srs s ℓs))]
@@ -1052,7 +1052,7 @@
 
 (define-metafunction Patina-machine
   sizeof-dst : srs ty hv -> z
-  
+
   [(sizeof-dst srs (vec ty erased) (int l))
    ,(* (term (sizeof srs ty)) (term l))]
 
@@ -1084,7 +1084,7 @@
 
 (define-metafunction Patina-machine
   memcopy : H α β z -> H
-  
+
   [(memcopy H α β 0) H]
 
   [(memcopy H α β z)
@@ -1111,13 +1111,13 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; vaddr -- lookup addr of variable in V
- 
+
 (define-metafunction Patina-machine
   vaddr : V x -> α
-  
+
   [(vaddr V x_0)
    ,(get* (term x_0) (term V))])
-         
+
 (test-equal (term (vaddr (((a 0) (b 1)) ((c 2))) a))
             (term 0))
 (test-equal (term (vaddr (((a 0) (b 1)) ((c 2))) b))
@@ -1127,10 +1127,10 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; vtype -- lookup type of variable in V
- 
+
 (define-metafunction Patina-machine
   vtype : T x -> ty
-  
+
   [(vtype T x_0)
    ,(get* (term x_0) (term T))])
 
@@ -1143,7 +1143,7 @@
 
 (define-metafunction Patina-machine
   field-names : srs s ℓs -> fs
-  
+
   [(field-names srs s ℓs)
    ,(range (term z))
    (where tys (field-tys srs s ℓs))
@@ -1159,7 +1159,7 @@
 
 (define-metafunction Patina-machine
   field-offsets : srs s ℓs -> zs
-  
+
   [(field-offsets srs s ℓs)
    (prefix-sum 0 (0 z ...))
    (where (ty_a ... ty_z) (field-tys srs s ℓs))
@@ -1180,11 +1180,11 @@
 
   [(vec-offsets srs ty 0)
    []]
-  
+
   [(vec-offsets srs ty 1)
    [0]]
-  
-  [(vec-offsets srs ty l) ;; really, really inefficient. 
+
+  [(vec-offsets srs ty l) ;; really, really inefficient.
    (z_a ... z_y (offset z_y (sizeof srs ty)))
    (where [z_a ... z_y] (vec-offsets srs ty (dec l)))]
 
@@ -1202,10 +1202,10 @@
 
   [(vec-tys srs ty 0)
    []]
-  
+
   [(vec-tys srs ty 1)
    [ty]]
-  
+
   [(vec-tys srs ty l)
    (ty ty_a ...)
    (where [ty_a ...] (vec-tys srs ty (dec l)))]
@@ -1220,7 +1220,7 @@
 
 (define-metafunction Patina-machine
   offsetof : srs s ℓs f -> z
-  
+
   [(offsetof srs s ℓs f)
    ,(foldl + 0 (map (λ (t) (term (sizeof srs ,t)))
                     (take (term (field-tys srs s ℓs))
@@ -1243,25 +1243,25 @@
 
 (define-metafunction Patina-machine
   dereftype : ty -> ty
-  
+
   [(dereftype (~ ty)) ty]
   [(dereftype (& ℓ mq ty)) ty])
 
 (define-metafunction Patina-machine
   fieldtype : srs ty f -> ty
-  
+
   [(fieldtype srs (struct s ℓs) f)
    ,(car (drop (term (field-tys srs s ℓs)) (term f)))]) ; fixme--surely a better way
 
 (define-metafunction Patina-machine
   lvtype : srs T lv -> ty
-  
+
   [(lvtype srs T x)
    (vtype T x)]
-  
+
   [(lvtype srs T (* lv))
    (dereftype (lvtype srs T lv))]
-  
+
   [(lvtype srs T (lv · f))
    (fieldtype srs (lvtype srs T lv) f)])
 
@@ -1287,14 +1287,14 @@
 
 (define-metafunction Patina-machine
   lvaddr : srs H V T lv -> α
-  
+
   [(lvaddr srs H V T x)
    (vaddr V x)]
-  
+
   [(lvaddr srs H V T (* lv))
    α
    (where (ptr α) (deref H (lvaddr srs H V T lv)))]
-       
+
   [(lvaddr srs H V T (lv · f))
    (offset (lvaddr srs H V T lv)
            (offsetof srs s ℓs f))
@@ -1458,10 +1458,10 @@
    (where β (lvaddr srs H V T lv))
    (where (H_1 γ) (malloc H z))
    (where H_2 (memcopy H_1 γ β z))]
-   
+
   [(rveval srs H V T α number)
    (update H α (int number))]
-   
+
   [(rveval srs H V T α (lv_l + lv_r))
    (update H α (int number_s))
 
@@ -1554,7 +1554,7 @@
 
 (define-metafunction Patina-machine
   lvselect : srs H V T lv -> (hv ...)
-  
+
   [(lvselect srs H V T lv)
    ,(select (term H) (term α) (term z))
 
@@ -1757,7 +1757,7 @@
                                 10
                                 (vec int erased)))
             (term [(1 (int 22)) (10 (ptr 95)) (11 (int 3)) (98 (int 36))]))
-            
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; drop-contents -- drops the memory owned by `α` which has type `ty`
 ;;
@@ -1772,7 +1772,7 @@
   [(drop-contents-at-offsets srs H α (ty_0 ty_1 ...) (z_0 z_1 ...))
    (drop-contents-at-offsets srs H_1 α (ty_1 ...) (z_1 ...))
    (where H_1 (drop-contents srs H ty_0 (offset α z_0)))]
-  
+
   )
 
 (define-metafunction Patina-machine
@@ -1877,7 +1877,7 @@
                                   [(i 1) (p 10)]
                                   [(i int) (p (~ int))]))
             (term ((99 (int 33)))))
-            
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; alloc-variables -- allocate space for variables upon entry to a block,
 ;; filling the memory with void
@@ -1911,7 +1911,7 @@
 
 (define-metafunction Patina-machine
   unwrap : srs H ℓ mode ty α -> (H ty α)
-  
+
   [(unwrap srs H ℓ (ref ℓ_x mq_x) ty α)
    (H_u ty_m α_m)
    ;; type of variable `x_m`
@@ -1951,7 +1951,6 @@
 (define machine-step
   (reduction-relation
    Patina-machine #:domain C
-   
    ;; Stack frame with no more statements. Free variables.
    [--> ((srs fns) H [vmap_0 vmap_1 ...] [vdecls_0 vdecls_1 ...]
          [(ℓ ()) sf_1 ...])
@@ -2162,7 +2161,7 @@
          [[] [(outp 2)] [(resultp 1)]]
          [[] [(outp (& l0 mut int))] [(resultp (& l0 mut int))]]
          [(l1 [])
-          (lX []) 
+          (lX [])
          (l0 [])])))
 (check-not-false (redex-match Patina-machine C state-3))
 
@@ -2233,7 +2232,7 @@
   ;; in-scope loans
   (loan (ℓ mq lv))
   (£ [loan ...])
-         
+
   )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -2355,7 +2354,7 @@
 (define-judgment-form
   Patina-typing
   #:mode     (subtype-variance I I I I)
-  #:contract (subtype-variance Λ vq ℓ ℓ) 
+  #:contract (subtype-variance Λ vq ℓ ℓ)
   ; invariant
   [--------------------------------
    (subtype-variance Λ in ℓ_0 ℓ_0)]
@@ -2458,7 +2457,7 @@
   [(ty-is-pod srs (struct s ℓs))
    (∀ [(ty-is-pod srs ty_s) ...])
    (where [ty_s ...] (field-tys srs s ℓs))]
-   
+
   )
 
 (test-equal
@@ -2512,7 +2511,7 @@
   [(ty-needs-drop srs (struct s ℓs))
    (∃ [(ty-needs-drop srs ty_s) ...])
    (where [ty_s ...] (field-tys srs s ℓs))]
-   
+
   )
 
 (test-equal
@@ -2857,7 +2856,7 @@
    (if-true [lv_Δ ...]
             [(¬ (path-is-prefix-of lv lv_Δ)) ...])
    (where [lv_Δ ...] Δ)
-   ]  
+   ]
 
   )
 
@@ -3421,7 +3420,7 @@
    (owned-path srs T lv)
 
    ;; Otherwise same as write:
-   (can-write-to srs T Λ £ Δ lv) 
+   (can-write-to srs T Λ £ Δ lv)
    --------------------------------------------------
    (can-move-from srs T Λ £ Δ lv)]
 
@@ -3732,7 +3731,7 @@
    (side-condition (¬ (ty-is-pod srs ty)))
    --------------------------------------------------
    (use-lv-ok srs T Λ £ Δ lv ty (∪ Δ [lv]))]
-  
+
   )
 
 ;; using a ~ or &mut pointer kills that pointer (resp. referent)
@@ -4529,7 +4528,7 @@
 
 (test-equal
  (judgment-holds (fn-ok ,sum-prog
-                        (fun sum-list [a b] 
+                        (fun sum-list [a b]
                                       [(inp (& a imm (struct List [])))
                                        (outp (& b mut int))]
                              (block l0
@@ -4583,17 +4582,17 @@
    (struct-parameter-variances srs s (vq ...))]
    )
 
-(test-equal 
-  (judgment-holds (struct-parameter-variances ,test-srs A (vq ...)) (vq ...)) 
+(test-equal
+  (judgment-holds (struct-parameter-variances ,test-srs A (vq ...)) (vq ...))
   '(()))
-(test-equal 
-  (judgment-holds (struct-parameter-variances ,test-srs B (vq ...)) (vq ...)) 
+(test-equal
+  (judgment-holds (struct-parameter-variances ,test-srs B (vq ...)) (vq ...))
   '((contra)))
-(test-equal 
-  (judgment-holds (struct-parameter-variances ,test-srs C (vq ...)) (vq ...)) 
+(test-equal
+  (judgment-holds (struct-parameter-variances ,test-srs C (vq ...)) (vq ...))
   '((contra)))
-(test-equal 
-  (judgment-holds (struct-parameter-variances ,test-srs D (vq ...)) (vq ...)) 
+(test-equal
+  (judgment-holds (struct-parameter-variances ,test-srs D (vq ...)) (vq ...))
   '((contra)))
 
 ; variance xform
@@ -4682,11 +4681,11 @@
    (struct-variance-ok srs (struct s ((vq ℓ) ...) (ty ...)))]
   )
 
-(test-equal 
-  (term (struct-variance-ok ,test-srs (struct F ((contra l0)) ((struct B (l0)))))) 
+(test-equal
+  (term (struct-variance-ok ,test-srs (struct F ((contra l0)) ((struct B (l0))))))
   #t)
-(test-equal 
-  (term (struct-variance-ok ,test-srs (struct F ((co l0)) ((struct B (l0)))))) 
+(test-equal
+  (term (struct-variance-ok ,test-srs (struct F ((co l0)) ((struct B (l0))))))
   #f)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -4705,5 +4704,5 @@
    (struct-variance-ok srs sr) ...
    --------------------------------------------------
    (prog-ok prog)]
-  
+
 )
