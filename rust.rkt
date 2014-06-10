@@ -230,9 +230,9 @@
 
 (define test-dst-srs
   (term [(struct RCDataInt3 () [int (vec int 3)])
-         (struct RCInt3 ((co l0)) [(& l0 imm (struct RCDataInt3 []))])
+         (struct RCInt3 ((contra l0)) [(& l0 imm (struct RCDataInt3 []))])
          (struct RCDataIntN () (int (vec int erased)))
-         (struct RCIntN ((co l0)) [(& l0 imm (struct RCDataIntN []))])
+         (struct RCIntN ((contra l0)) [(& l0 imm (struct RCDataIntN []))])
          (struct Cycle1 () [(Option (~ (struct Cycle []))) (vec int erased)])
          (struct Cycle2 () [(Option (~ (struct Cycle [])))])
          ]))
@@ -342,9 +342,9 @@
 
 (define dst-srs
   (term [(struct RCDataInt3 () [int (vec int 3)])
-         (struct RCInt3 ((co l0)) [(& l0 imm (struct RCDataInt3 []))])
+         (struct RCInt3 ((contra l0)) [(& l0 imm (struct RCDataInt3 []))])
          (struct RCDataIntN () (int (vec int erased)))
-         (struct RCIntN ((co l0)) [(& l0 imm (struct RCDataIntN []))])
+         (struct RCIntN ((contra l0)) [(& l0 imm (struct RCDataIntN []))])
          ]))
 
 ;; gonna be super tedious...
